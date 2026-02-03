@@ -1,0 +1,80 @@
+# External binaries
+backend/bin/rhubarb/
+backend/bin/ffmpeg/
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+out/
+.next/
+
+# Binaries
+*.exe
+*.dll
+*.so
+*.dylib
+*.bin
+*.o
+*.obj
+*.a
+*.lib
+*.pyc
+*.pyo
+*.class
+*.jar
+*.war
+*.ear
+
+# Audio/Video binaries
+*.mp3
+*.wav
+*.ogg
+*.flac
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.webm
+
+# Image binaries (optional - uncomment if needed)
+# *.png
+# *.jpg
+# *.jpeg
+# *.gif
+# *.ico
+# *.webp
+
+# Temp files
+temp/
+tmp/
+*.tmp
+*.temp
+*.log
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE/Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.egg-info/
+venv/
+.venv/
+
+# Coverage/Testing
+coverage/
+.nyc_output/
