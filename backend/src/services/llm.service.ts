@@ -41,6 +41,9 @@ export class LLMService implements ILLMService {
         : JSON.stringify(response.content);
 
       logger.debug(`Received response: ${content.substring(0, 100)}...`);
+
+      logger.info(`OLLAMA RESPONSE: ${content}`);
+
       return content;
     } catch (error) {
       logger.error(`LLM error: ${error}`);

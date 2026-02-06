@@ -2,7 +2,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import fs from 'fs/promises';
-import { ElevenLabsClient } from 'elevenlabs';
+import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
 import { config } from '../config/index.js';
 import { ISTTService } from './interfaces/stt.interface.js';
 import { ITTSService } from './interfaces/tts.interface.js';
@@ -40,16 +40,16 @@ export class AudioService implements ISTTService, ITTSService {
       logger.debug(`Running Whisper: ${command}`);
       logger.debug(`CWD: ${process.cwd()}`);
       const { stdout, stderr } = await execAsync(command, { timeout: 120000, cwd: process.cwd() });
-      if (stdout) console.log('Whisper stdout:', stdout);
-      if (stderr) console.log('Whisper stderr:', stderr);
+      if (stdout) logger.debug(`Whisper stdout: ${stdout}`);
+      if (stderr) logger.debug(`Whisper stderr: ${stderr}`);
 
       // Debug: list temp folder contents
       const tempFiles = await fs.readdir(config.paths.temp);
-      console.log('Temp folder contents:', tempFiles.filter(f => f.includes('.txt')));
+      logger.debug(`Temp folder contents: ${tempFiles.filter(f => f.includes('.txt'))}`);
 
       // Read the transcription output (whisper.cpp appends .txt to relative path)
       const txtPath = relativeWavPath + '.txt';
-      console.log('Looking for:', txtPath);
+      logger.debug(`Looking for: ${txtPath}`);
       const transcription = await fs.readFile(txtPath, 'utf-8');
 
       // Cleanup temp files - DISABLED FOR TESTING
@@ -61,9 +61,7 @@ export class AudioService implements ISTTService, ITTSService {
       const result = transcription.trim();
       logger.debug(`Transcription: ${result}`);
 
-      console.log('\n========================================');
-      console.log('WHISPER STT RESULT:', result);
-      console.log('========================================\n');
+      logger.info(`WHISPER STT RESULT: ${result}`);
 
       return result;
     } catch (error) {
@@ -99,10 +97,9 @@ export class AudioService implements ISTTService, ITTSService {
     try {
       logger.debug(`Synthesizing text: ${text.substring(0, 50)}...`);
 
-      const audioStream = await this.elevenLabs.generate({
-        voice: config.elevenLabs.voiceId,
+      const audioStream = await this.elevenLabs.textToSpeech.convert(config.elevenLabs.voiceId,{
         text,
-        model_id: 'eleven_multilingual_v2',
+        modelId: 'eleven_multilingual_v2',
       });
 
       // Convert stream to buffer

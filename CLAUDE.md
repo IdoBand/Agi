@@ -5,6 +5,7 @@
 
 ## Specific project rules
 - using type 'any' is not allowed. All variables should be strongly typed.
+- for backend logging use ./backend/sre/utils/logger.ts
 
 ## Reusability
 - always prefer existing types, components, hooks and libraries before creating/installing new ones, unless told otherwise.
