@@ -1,5 +1,6 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import path from 'path';
 import fs from 'fs/promises';
 import { ElevenLabsClient } from 'elevenlabs';
 import { config } from '../config/index.js';
@@ -31,14 +32,24 @@ export class AudioService implements ISTTService, ITTSService {
       // Convert to WAV if needed (Whisper works best with WAV)
       const wavPath = await this.convertToWav(audioPath);
 
-      // Run Whisper CLI with Hungarian language
-      const command = `whisper "${wavPath}" --model ${config.whisper.model} --language hu --output_format txt --output_dir "${config.paths.temp}"`;
+      // Run whisper.cpp with Hungarian language
+      // Use relative path - whisper.cpp outputs relative to input path
+      const relativeWavPath = path.relative(process.cwd(), wavPath);
+      const command = `"${config.whisper.path}" -m "${config.whisper.modelPath}" -f "${relativeWavPath}" -l hu -t 6 -otxt`;
 
       logger.debug(`Running Whisper: ${command}`);
-      await execAsync(command, { timeout: 120000 }); // 2 minute timeout
+      logger.debug(`CWD: ${process.cwd()}`);
+      const { stdout, stderr } = await execAsync(command, { timeout: 120000, cwd: process.cwd() });
+      if (stdout) console.log('Whisper stdout:', stdout);
+      if (stderr) console.log('Whisper stderr:', stderr);
 
-      // Read the transcription output
-      const txtPath = wavPath.replace('.wav', '.txt');
+      // Debug: list temp folder contents
+      const tempFiles = await fs.readdir(config.paths.temp);
+      console.log('Temp folder contents:', tempFiles.filter(f => f.includes('.txt')));
+
+      // Read the transcription output (whisper.cpp appends .txt to relative path)
+      const txtPath = relativeWavPath + '.txt';
+      console.log('Looking for:', txtPath);
       const transcription = await fs.readFile(txtPath, 'utf-8');
 
       // Cleanup temp files - DISABLED FOR TESTING
@@ -49,6 +60,10 @@ export class AudioService implements ISTTService, ITTSService {
 
       const result = transcription.trim();
       logger.debug(`Transcription: ${result}`);
+
+      console.log('\n========================================');
+      console.log('WHISPER STT RESULT:', result);
+      console.log('========================================\n');
 
       return result;
     } catch (error) {
