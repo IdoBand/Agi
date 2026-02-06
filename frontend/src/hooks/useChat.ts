@@ -16,6 +16,7 @@ interface UseChatReturn {
   stopRecordingAndSend: () => void;
   onAudioEnd: () => void;
   clearMessages: () => void;
+  playTestLipsync: () => void;
 }
 
 export function useChat(): UseChatReturn {
@@ -126,6 +127,35 @@ export function useChat(): UseChatReturn {
     }
   }, []);
 
+  const playTestLipsync = useCallback(async () => {
+    try {
+      const [audioRes, lipsyncRes] = await Promise.all([
+        fetch('/lipsync-test/20a01544-48fa-4ab6-8365-bfe7084a7bd7.mp3'),
+        fetch('/lipsync-test/e76fe7d0-ab79-45a6-ac52-88a9f3c48865.json'),
+      ]);
+
+      const audioBlob = await audioRes.blob();
+      const audioBase64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+        reader.readAsDataURL(audioBlob);
+      });
+
+      const lipsync = await lipsyncRes.json();
+
+      setCurrentMessage({
+        role: 'assistant',
+        content: 'Test',
+        audio: audioBase64,
+        lipsync,
+        facialExpression: 'smile',
+      });
+      setIsPlaying(true);
+    } catch (err) {
+      console.error('Test lipsync error:', err);
+    }
+  }, []);
+
   return {
     messages,
     currentMessage,
@@ -140,5 +170,6 @@ export function useChat(): UseChatReturn {
     stopRecordingAndSend,
     onAudioEnd,
     clearMessages,
+    playTestLipsync,
   };
 }

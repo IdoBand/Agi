@@ -44,6 +44,7 @@ export default function App() {
     selectedDeviceId,
     setSelectedDeviceId,
     onAudioEnd,
+    playTestLipsync,
   } = useChat();
 
   return (
@@ -63,7 +64,7 @@ export default function App() {
       </Canvas>
 
       {/* Microphone selector */}
-      <div className="absolute top-4 left-4 z-10">
+      <div className="absolute top-4 left-4 z-10 flex gap-2">
         <select
           value={selectedDeviceId || ''}
           onChange={(e) => setSelectedDeviceId(e.target.value)}
@@ -76,6 +77,13 @@ export default function App() {
             </option>
           ))}
         </select>
+        <button
+          onClick={playTestLipsync}
+          disabled={isPlaying}
+          className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white px-3 py-2 rounded-lg"
+        >
+          Test Lipsync
+        </button>
       </div>
 
       <PushToTalk

@@ -21,16 +21,6 @@ export function Avatar({
 }: AvatarProps) {
   const { scene } = useGLTF(modelUrl);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const meshRef = useRef<THREE.SkinnedMesh | null>(null);
-
-  // Find the skinned mesh with morph targets
-  useEffect(() => {
-    scene.traverse((child) => {
-      if (child instanceof THREE.SkinnedMesh && child.morphTargetDictionary) {
-        meshRef.current = child;
-      }
-    });
-  }, [scene]);
 
   // Create audio element and handle playback
   useEffect(() => {
@@ -72,46 +62,38 @@ export function Avatar({
     };
   }, [lipsync]);
 
-  // Smooth morph target transitions
-  const lerpMorphTarget = (
-    mesh: THREE.SkinnedMesh,
-    target: string,
-    value: number,
-    speed: number
-  ) => {
-    const index = mesh.morphTargetDictionary?.[target];
-    if (index === undefined || !mesh.morphTargetInfluences) {
-      return;
-    }
-
-    mesh.morphTargetInfluences[index] = lerp(
-      mesh.morphTargetInfluences[index],
-      value,
-      speed
-    );
+  // Smooth morph target transitions - applies to ALL meshes with morph targets
+  const lerpMorphTarget = (target: string, value: number, speed: number) => {
+    scene.traverse((child) => {
+      if (child instanceof THREE.SkinnedMesh && child.morphTargetDictionary) {
+        const index = child.morphTargetDictionary[target];
+        if (index !== undefined && child.morphTargetInfluences) {
+          child.morphTargetInfluences[index] = lerp(
+            child.morphTargetInfluences[index],
+            value,
+            speed
+          );
+        }
+      }
+    });
   };
 
   // Animation frame
   useFrame(() => {
-    const mesh = meshRef.current;
-    if (!mesh || !mesh.morphTargetDictionary) {
-      return;
-    }
-
     const audioElement = audioRef.current;
     const currentTime = audioElement?.currentTime || 0;
     const isAudioPlaying = audioElement && !audioElement.paused;
 
     // Reset all visemes
     allVisemes.forEach((viseme) => {
-      lerpMorphTarget(mesh, viseme, 0, 0.5);
+      lerpMorphTarget(viseme, 0, 0.5);
     });
 
     // Apply current viseme if audio is playing
     if (isAudioPlaying && lipsync) {
       const viseme = getCurrentViseme(currentTime);
       const morphTarget = visemeMapping[viseme] || 'viseme_PP';
-      lerpMorphTarget(mesh, morphTarget, 1, 0.5);
+      lerpMorphTarget(morphTarget, 1, 0.5);
     }
 
     // Apply facial expression
@@ -120,13 +102,13 @@ export function Avatar({
     // Reset expression morph targets not in current expression
     allExpressionMorphTargets.forEach((target) => {
       if (!(target in expressionTargets)) {
-        lerpMorphTarget(mesh, target, 0, 0.1);
+        lerpMorphTarget(target, 0, 0.1);
       }
     });
 
     // Apply expression morph targets
     Object.entries(expressionTargets).forEach(([target, value]) => {
-      lerpMorphTarget(mesh, target, value, 0.1);
+      lerpMorphTarget(target, value as number, 0.1);
     });
   });
 

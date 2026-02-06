@@ -5,7 +5,7 @@ import { lipsyncService } from '../services/lipsync.service.js';
 import { ChatMessage, ChatResponse, FacialExpression } from '../types/message.types.js';
 import { ChatRequest, TextChatRequest } from '../types/request.types.js';
 import { logger } from '../utils/logger.js';
-import { deleteTempFile, readFileAsBase64 } from '../utils/file.utils.js';
+import { deleteTempFile, readFileAsBase64, WorkflowContext, createWorkflowContext, createWorkflowFile } from '../utils/file.utils.js';
 
 // In-memory conversation history (for demo purposes)
 // In production, use a database or session storage
@@ -54,8 +54,11 @@ export async function handleVoiceChat(
   try {
     logger.info('Processing voice chat request');
 
+    // Create workflow context from upload middleware's workflowId
+    const ctx: WorkflowContext = { workflowId: req.workflowId! };
+
     // Step 1: Transcribe audio to text (STT)
-    const userText = await audioService.transcribe(audioFile.path);
+    const userText = await audioService.transcribe(audioFile.path, ctx);
     logger.info(`User said: ${userText}`);
 
     if (!userText || userText.trim() === '') {
@@ -73,12 +76,15 @@ export async function handleVoiceChat(
       conversationHistory.splice(0, 2);
     }
 
+    // Save LLM response to workflow output
+    await createWorkflowFile(ctx, 'output', 'response.txt', llmResponse);
+
     // Step 3: Synthesize response to audio (TTS)
     const audioBuffer = await audioService.synthesize(llmResponse);
-    const audioPath = await audioService.saveToFile(audioBuffer);
+    const audioPath = await audioService.saveToFile(audioBuffer, ctx);
 
     // Step 4: Generate lipsync data
-    const lipsyncData = await lipsyncService.generateLipsync(audioPath);
+    const lipsyncData = await lipsyncService.generateLipsync(audioPath, ctx);
 
     // Step 5: Prepare response
     const audioBase64 = await readFileAsBase64(audioPath);
@@ -124,6 +130,9 @@ export async function handleTextChat(
   try {
     logger.info(`Processing text chat: ${message}`);
 
+    // Create new workflow context for text chat
+    const ctx = createWorkflowContext();
+
     // Step 1: Add to conversation history and get LLM response
     conversationHistory.push({ role: 'user', content: message });
     const llmResponse = await llmService.chat(conversationHistory);
@@ -134,12 +143,15 @@ export async function handleTextChat(
       conversationHistory.splice(0, 2);
     }
 
+    // Save LLM response to workflow output
+    await createWorkflowFile(ctx, 'output', 'response.txt', llmResponse);
+
     // Step 2: Synthesize response to audio (TTS)
     const audioBuffer = await audioService.synthesize(llmResponse);
-    const audioPath = await audioService.saveToFile(audioBuffer);
+    const audioPath = await audioService.saveToFile(audioBuffer, ctx);
 
     // Step 3: Generate lipsync data
-    const lipsyncData = await lipsyncService.generateLipsync(audioPath);
+    const lipsyncData = await lipsyncService.generateLipsync(audioPath, ctx);
 
     // Step 4: Prepare response
     const audioBase64 = await readFileAsBase64(audioPath);
@@ -152,8 +164,8 @@ export async function handleTextChat(
       facialExpression: expression,
     };
 
-    // Cleanup
-    await deleteTempFile(audioPath);
+    // Cleanup - DISABLED FOR TESTING (workflow dirs handle organization now)
+    // await deleteTempFile(audioPath);
 
     logger.info('Text chat response sent');
     res.json(response);

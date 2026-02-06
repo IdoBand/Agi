@@ -7,7 +7,7 @@ import { config } from '../config/index.js';
 import { ISTTService } from './interfaces/stt.interface.js';
 import { ITTSService } from './interfaces/tts.interface.js';
 import { logger } from '../utils/logger.js';
-import { createTempFile, deleteTempFile } from '../utils/file.utils.js';
+import { createTempFile, deleteTempFile, WorkflowContext, createWorkflowFile } from '../utils/file.utils.js';
 
 const execAsync = promisify(exec);
 
@@ -27,10 +27,10 @@ export class AudioService implements ISTTService, ITTSService {
    * Transcribe audio to text using Whisper CLI
    * Requires: pip install openai-whisper
    */
-  async transcribe(audioPath: string): Promise<string> {
+  async transcribe(audioPath: string, ctx?: WorkflowContext): Promise<string> {
     try {
       // Convert to WAV if needed (Whisper works best with WAV)
-      const wavPath = await this.convertToWav(audioPath);
+      const wavPath = await this.convertToWav(audioPath, ctx);
 
       // Run whisper.cpp with Hungarian language
       // Use relative path - whisper.cpp outputs relative to input path
@@ -51,6 +51,12 @@ export class AudioService implements ISTTService, ITTSService {
       const txtPath = relativeWavPath + '.txt';
       logger.debug(`Looking for: ${txtPath}`);
       const transcription = await fs.readFile(txtPath, 'utf-8');
+
+      // Copy transcript to workflow dir if context provided
+      if (ctx) {
+        const destPath = await createWorkflowFile(ctx, 'input', 'transcript.txt');
+        await fs.copyFile(txtPath, destPath);
+      }
 
       // Cleanup temp files - DISABLED FOR TESTING
       // if (wavPath !== audioPath) {
@@ -73,12 +79,14 @@ export class AudioService implements ISTTService, ITTSService {
   /**
    * Convert audio to WAV format using FFmpeg
    */
-  private async convertToWav(inputPath: string): Promise<string> {
+  private async convertToWav(inputPath: string, ctx?: WorkflowContext): Promise<string> {
     if (inputPath.endsWith('.wav')) {
       return inputPath;
     }
 
-    const outputPath = await createTempFile('.wav');
+    const outputPath = ctx
+      ? await createWorkflowFile(ctx, 'input', 'converted.wav')
+      : await createTempFile('.wav');
 
     try {
       const command = `"${this.ffmpegPath}" -i "${inputPath}" -ar 16000 -ac 1 -y "${outputPath}"`;
@@ -100,6 +108,9 @@ export class AudioService implements ISTTService, ITTSService {
       const audioStream = await this.elevenLabs.textToSpeech.convert(config.elevenLabs.voiceId,{
         text,
         modelId: 'eleven_multilingual_v2',
+        voiceSettings: {
+          
+        }
       });
 
       // Convert stream to buffer
@@ -121,8 +132,10 @@ export class AudioService implements ISTTService, ITTSService {
   /**
    * Save audio buffer to a temp file and return the path
    */
-  async saveToFile(audioBuffer: Buffer): Promise<string> {
-    const filePath = await createTempFile('.mp3');
+  async saveToFile(audioBuffer: Buffer, ctx?: WorkflowContext): Promise<string> {
+    const filePath = ctx
+      ? await createWorkflowFile(ctx, 'output', 'audio.mp3')
+      : await createTempFile('.mp3');
     await fs.writeFile(filePath, audioBuffer);
     return filePath;
   }

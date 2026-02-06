@@ -1,15 +1,21 @@
 import multer from 'multer';
 import path from 'path';
+import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { config } from '../config/index.js';
+import { ChatRequest } from '../types/request.types.js';
 
 const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, config.paths.temp);
+  destination: (req, _file, cb) => {
+    const workflowId = uuidv4();
+    (req as ChatRequest).workflowId = workflowId;
+    const inputDir = path.join(config.paths.temp, workflowId, 'input');
+    fs.mkdirSync(inputDir, { recursive: true });
+    cb(null, inputDir);
   },
   filename: (_req, file, cb) => {
     const ext = path.extname(file.originalname) || '.webm';
-    cb(null, `${uuidv4()}${ext}`);
+    cb(null, `original${ext}`);
   },
 });
 

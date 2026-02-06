@@ -3,6 +3,37 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { config } from '../config/index.js';
 
+export interface WorkflowContext {
+  workflowId: string;
+}
+
+export function createWorkflowContext(): WorkflowContext {
+  return { workflowId: uuidv4() };
+}
+
+export function getWorkflowInputDir(ctx: WorkflowContext): string {
+  return path.join(config.paths.temp, ctx.workflowId, 'input');
+}
+
+export function getWorkflowOutputDir(ctx: WorkflowContext): string {
+  return path.join(config.paths.temp, ctx.workflowId, 'output');
+}
+
+export async function createWorkflowFile(
+  ctx: WorkflowContext,
+  type: 'input' | 'output',
+  filename: string,
+  content?: Buffer | string
+): Promise<string> {
+  const dir = type === 'input' ? getWorkflowInputDir(ctx) : getWorkflowOutputDir(ctx);
+  await ensureDir(dir);
+  const filepath = path.join(dir, filename);
+  if (content !== undefined) {
+    await fs.writeFile(filepath, content);
+  }
+  return filepath;
+}
+
 export async function ensureDir(dirPath: string): Promise<void> {
   try {
     await fs.access(dirPath);
