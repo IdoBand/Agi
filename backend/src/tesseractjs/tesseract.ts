@@ -1,11 +1,11 @@
-import { createWorker } from 'tesseract.js';
 import Tesseract from 'tesseract.js';
 import path from "path";
+import fs from "fs";
 
-const tesseractPath = path.join(process.cwd(), 'src\\tesseractjs')
+const imagesDir = path.join(__dirname, 'images');
+
 // npx tsx ./src/tesseractjs/tesseract.ts
-
-function main() {
+async function main() {
 
     // images from url
     // (async () => {
@@ -14,17 +14,20 @@ function main() {
         //     console.log(ret.data.text);
         //     await worker.terminate();
         // })();
-        
-        
-    // local images
-    const imagePath = path.join(tesseractPath, 'images\\test.jpeg');
-    const langPath = path.join(tesseractPath, 'langData');
 
-    Tesseract.recognize(imagePath, 'hun')
-  .then(({ data: { text } }) => {
-    console.log('Extracted text:', text);
-  });
+    const files = fs.readdirSync(imagesDir).filter((f: string) =>
+        /\.(jpe?g|png|webp|gif)$/i.test(f)
+    );
 
+    const outputPath = path.join(__dirname, 'output.md');
+    fs.writeFileSync(outputPath, '');
+
+    for (const file of files) {
+        const imagePath = path.join(imagesDir, file);
+        const { data: { text } } = await Tesseract.recognize(imagePath, 'hun');
+        fs.appendFileSync(outputPath, text);
+        console.log(`extracted ${text.length} chars from ${file}`);
+    }
 }
 
-main()
+main();
