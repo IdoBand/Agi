@@ -41,12 +41,12 @@ out/
 *.webm
 
 # Image binaries (optional - uncomment if needed)
-# *.png
-# *.jpg
-# *.jpeg
+*.png
+*.jpg
+*.jpeg
 # *.gif
 # *.ico
-# *.webp
+*.webp
 
 # Temp files
 temp/
