@@ -5,6 +5,7 @@ import { errorHandler } from './middleware/error.middleware.js';
 import { handleVoiceChat, handleTextChat, clearHistory } from './controllers/chat.controller.js';
 import { ensureDir } from './utils/file.utils.js';
 import { config } from './config/index.js';
+import quizRoutes from './routes/quiz.routes.js';
 
 export async function createApp(): Promise<express.Application> {
   const app = express();
@@ -40,6 +41,9 @@ export async function createApp(): Promise<express.Application> {
       facialExpression: 'smile',
     });
   });
+
+  // Quiz routes
+  app.use('/quiz', quizRoutes);
 
   // Chat routes
   app.post('/chat', uploadAudio, handleVoiceChat);

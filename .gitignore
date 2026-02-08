@@ -55,6 +55,9 @@ tmp/
 *.temp
 *.log
 
+# assets
+backend/assets/questionsAudio
+
 # Environment files
 .env
 .env.local
