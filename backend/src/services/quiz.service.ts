@@ -8,8 +8,8 @@ import { llmService } from './llm.service.js';
 import { logger } from '../utils/logger.js';
 import { WorkflowContext } from '../utils/file.utils.js';
 
-const QUESTIONS_PATH = path.resolve('backend/src/tesseractjs/questions.json');
-const AUDIO_DIR = path.resolve('backend/assets/questionsAudio');
+const QUESTIONS_PATH = path.resolve('src/tesseractjs/questions.json');
+const AUDIO_DIR = path.resolve('assets/questionsAudio');
 
 let questionsCache: Question[] | null = null;
 
@@ -45,7 +45,7 @@ async function loadQuestionAudio(question: Question, index: number): Promise<Qui
 
   return {
     index,
-    text: question.q,
+    text: question.question,
     audio,
     lipsync,
     facialExpression: 'default',
