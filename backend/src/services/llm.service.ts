@@ -1,5 +1,6 @@
 import { ChatOllama } from '@langchain/ollama';
 import { HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages';
+import { z } from 'zod';
 import { config } from '../config/index.js';
 import { ChatMessage } from '../types/message.types.js';
 import { ILLMService } from './interfaces/llm.interface.js';
@@ -49,6 +50,9 @@ export class LLMService implements ILLMService {
       logger.error(`LLM error: ${error}`);
       throw new Error('Failed to get response from LLM');
     }
+  }
+  async chatWithSchema<T extends z.ZodObject>(_messages: ChatMessage[], _systemPrompt: string, _schema: T): Promise<z.infer<T>> {
+    throw new Error('Not implemented');
   }
 }
 

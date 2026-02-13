@@ -2,11 +2,17 @@ import fs from 'fs/promises';
 import path from 'path';
 import { Question, QuizQuestion, QuizEvaluateResponse } from '../types/quiz.types.js';
 import { LipsyncData } from '../types/message.types.js';
+import { z } from 'zod';
 import { readFileAsBase64 } from '../utils/file.utils.js';
 import { audioService } from './audio.service.js';
-import { llmService } from './llm.service.js';
+import { chatgptService } from './chatgpt.service.js';
 import { logger } from '../utils/logger.js';
 import { WorkflowContext } from '../utils/file.utils.js';
+
+const EvalResponseSchema = z.object({
+  correct: z.boolean(),
+  explanation: z.string(),
+});
 
 const QUESTIONS_PATH = path.resolve('src/scripts/tesseractjs/questions.json');
 const AUDIO_DIR = path.resolve('assets/questionsAudio');
@@ -95,15 +101,8 @@ export async function evaluateAnswer(
     { role: 'user' as const, content: userPrompt },
   ];
 
-  const llmRaw = await llmService.chat(messages, EVAL_SYSTEM_PROMPT);
-  logger.info(`Quiz eval raw: ${llmRaw}`);
+  const result = await chatgptService.chatWithSchema(messages, EVAL_SYSTEM_PROMPT, EvalResponseSchema);
+  logger.info(`Quiz eval result: ${JSON.stringify(result)}`);
 
-  // Parse JSON from LLM response
-  try {
-    const parsed = JSON.parse(llmRaw) as { correct: boolean; explanation: string };
-    return { correct: parsed.correct, explanation: parsed.explanation, userTranscript };
-  } catch {
-    logger.error(`Failed to parse eval JSON: ${llmRaw}`);
-    return { correct: false, explanation: '', userTranscript };
-  }
+  return { correct: result.correct, explanation: result.explanation, userTranscript };
 }

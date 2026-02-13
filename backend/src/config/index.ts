@@ -11,6 +11,11 @@ export const config = {
     model: process.env.OLLAMA_MODEL,
   },
 
+  openai: {
+    apiKey: process.env.OPENAI_API_KEY || '',
+    model: process.env.OPENAI_MODEL || 'gpt-4o',
+  },
+
   elevenLabs: {
     apiKey: process.env.ELEVEN_LABS_API_KEY || '',
     voiceId: process.env.ELEVEN_LABS_VOICE_ID || 'kgG7dCoKCfLehAPWkJOE',
