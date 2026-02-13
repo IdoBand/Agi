@@ -1,5 +1,5 @@
 import { ChatMessage } from '../../types/message.types.js';
 
 export interface ILLMService {
-  chat(messages: ChatMessage[]): Promise<string>;
+  chat(messages: ChatMessage[], systemPrompt?: string): Promise<string>;
 }

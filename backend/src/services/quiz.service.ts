@@ -8,7 +8,7 @@ import { llmService } from './llm.service.js';
 import { logger } from '../utils/logger.js';
 import { WorkflowContext } from '../utils/file.utils.js';
 
-const QUESTIONS_PATH = path.resolve('src/tesseractjs/questions.json');
+const QUESTIONS_PATH = path.resolve('src/scripts/tesseractjs/questions.json');
 const AUDIO_DIR = path.resolve('assets/questionsAudio');
 
 let questionsCache: Question[] | null = null;
@@ -46,6 +46,7 @@ async function loadQuestionAudio(question: Question, index: number): Promise<Qui
   return {
     index,
     text: question.question,
+    answer: question.answer,
     audio,
     lipsync,
     facialExpression: 'default',
@@ -64,17 +65,24 @@ export async function getFirstQuestions(count: number): Promise<QuizQuestion[]> 
   return Promise.all(selected.map((q, i) => loadQuestionAudio(q, i)));
 }
 
-const EVAL_SYSTEM_PROMPT = `Te egy kvíz értékelő asszisztens vagy. A felhasználó egy kérdésre válaszolt.
-Döntsd el, hogy a válasz elfogadható-e. A válasznak nem kell tökéletesnek lennie,
-de relevánsnak és értelmesnek kell lennie a kérdés kontextusában.
-Adj egy rövid magyarázatot is, hogy miért helyes vagy helytelen a válasz.
+const EVAL_SYSTEM_PROMPT = `Te egy kvíz értékelő asszisztens vagy. A felhasználó egy kérdésre válaszolt szóban (beszédfelismeréssel átiratva).
+
+Szabályok:
+- Rövid válaszok (akár egyetlen szó) teljesen elfogadhatók, ha a jelentés stimmel.
+- A beszédfelismerés gyakran kisebb helyesírási hibákat ejt — ezeket ignoráld.
+- A kis- és nagybetűk közötti különbséget ignoráld (pl. "focizni" = "Focizni").
+- Csak azt vizsgáld, hogy a válasz JELENTÉSE megegyezik-e a helyes válasszal, vagy közel áll hozzá.
+- NE büntesd a választ a rövidsége vagy részletessége miatt.
+
+NE használj <think> tageket vagy bármilyen gondolkodási blokkot. CSAK a JSON-t add vissza, semmi mást.
 
 Válaszolj PONTOSAN ebben a JSON formátumban:
-{"correct": true/false, "explanation": "rövid magyarázat"}`;
+{"correct": true/false, "explanation": "short explanation in English"}`;
 
 export async function evaluateAnswer(
   audioPath: string,
   questionText: string,
+  correctAnswer: string,
   ctx?: WorkflowContext
 ): Promise<QuizEvaluateResponse> {
   // STT
@@ -82,12 +90,12 @@ export async function evaluateAnswer(
   logger.info(`Quiz STT: "${userTranscript}"`);
 
   // Build eval prompt
-  const userPrompt = `Kérdés: ${questionText}\nVálasz: ${userTranscript}`;
+  const userPrompt = `Kérdés: ${questionText}\nHelyes válasz: ${correctAnswer}\nA felhasználó válasza: ${userTranscript}`;
   const messages = [
-    { role: 'user' as const, content: `${EVAL_SYSTEM_PROMPT}\n\n${userPrompt}` },
+    { role: 'user' as const, content: userPrompt },
   ];
 
-  const llmRaw = await llmService.chat(messages);
+  const llmRaw = await llmService.chat(messages, EVAL_SYSTEM_PROMPT);
   logger.info(`Quiz eval raw: ${llmRaw}`);
 
   // Parse JSON from LLM response

@@ -13,6 +13,7 @@ export type QuizPhase =
 export interface QuizQuestion {
   index: number;
   text: string;
+  answer: string;
   audio: string;
   lipsync: LipsyncData;
   facialExpression: FacialExpression;

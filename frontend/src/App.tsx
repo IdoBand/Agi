@@ -1,9 +1,8 @@
 import { Canvas } from '@react-three/fiber';
 import { Suspense, useState } from 'react';
 import { Experience } from './components/Experience';
-import { PushToTalk } from './components/PushToTalk';
 import { QuizControlPanel } from './components/QuizControlPanel';
-import { useChat } from './hooks/useChat';
+import { useVoiceRecorder } from './hooks/useVoiceRecorder';
 import { useQuiz } from './hooks/useQuiz';
 
 function LoadingOverlay() {
@@ -22,11 +21,10 @@ function SceneContent({
   onAudioEnd,
   onLoaded,
 }: {
-  currentMessage: ReturnType<typeof useChat>['currentMessage'];
+  currentMessage: ReturnType<typeof useQuiz>['currentMessage'];
   onAudioEnd: () => void;
   onLoaded: () => void;
 }) {
-  // Trigger loaded callback when component mounts
   useState(() => {
     onLoaded();
   });
@@ -36,30 +34,29 @@ function SceneContent({
 
 export default function App() {
   const [isModelLoaded, setIsModelLoaded] = useState(false);
-  const quiz = useQuiz();
-  const isQuizActive = quiz.phase !== 'idle';
-  const chat = useChat(isQuizActive);
 
-  // Quiz controls currentMessage and onAudioEnd when active
-  const currentMessage = isQuizActive ? quiz.currentMessage : chat.currentMessage;
-  const onAudioEnd = isQuizActive ? quiz.onQuestionAudioEnd : chat.onAudioEnd;
+  const {
+    isRecording,
+    devices,
+    selectedDeviceId,
+    setSelectedDeviceId,
+    startRecording,
+    stopRecording,
+  } = useVoiceRecorder();
 
-  // Use quiz device selection when quiz active, else chat's
-  const devices = isQuizActive ? quiz.devices : chat.devices;
-  const selectedDeviceId = isQuizActive ? quiz.selectedDeviceId : chat.selectedDeviceId;
-  const setSelectedDeviceId = isQuizActive ? quiz.setSelectedDeviceId : chat.setSelectedDeviceId;
+  const quiz = useQuiz({ isRecording, selectedDeviceId, startRecording, stopRecording });
 
   return (
     <div className="w-full h-screen bg-gray-900 relative">
       <Canvas
         shadows
-        camera={{ position: [0, 0, 3], fov: 50 }}
+        camera={{ position: [0, 1.0, 1.6], fov: 38 }}
         className="w-full h-full"
       >
         <Suspense fallback={null}>
           <SceneContent
-            currentMessage={currentMessage}
-            onAudioEnd={onAudioEnd}
+            currentMessage={quiz.currentMessage}
+            onAudioEnd={quiz.onQuestionAudioEnd}
             onLoaded={() => setIsModelLoaded(true)}
           />
         </Suspense>
@@ -81,41 +78,19 @@ export default function App() {
         </select>
       </div>
 
-      {/* Quiz UI or Chat UI */}
-      {isQuizActive ? (
-        <QuizControlPanel
-          phase={quiz.phase}
-          isRecording={quiz.isRecording}
-          currentIndex={quiz.currentIndex}
-          totalQuestions={quiz.totalQuestions}
-          result={quiz.result}
-          score={quiz.score}
-          onStartQuiz={quiz.startQuiz}
-          onSendAnswer={quiz.sendAnswer}
-          onNextQuestion={quiz.nextQuestion}
-        />
-      ) : (
-        <>
-          <PushToTalk
-            isRecording={chat.isRecording}
-            isLoading={chat.isLoading}
-            isPlaying={chat.isPlaying}
-            error={chat.error}
-            micSelected={!!chat.selectedDeviceId}
-          />
-          {/* Start Quiz button */}
-          {selectedDeviceId && (
-            <div className="fixed bottom-20 left-1/2 transform -translate-x-1/2 z-10">
-              <button
-                onClick={quiz.startQuiz}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-full shadow-lg font-medium transition-colors"
-              >
-                Start Quiz
-              </button>
-            </div>
-          )}
-        </>
-      )}
+      <QuizControlPanel
+        phase={quiz.phase}
+        isRecording={quiz.isRecording}
+        currentIndex={quiz.currentIndex}
+        totalQuestions={quiz.totalQuestions}
+        result={quiz.result}
+        score={quiz.score}
+        currentQuestionText={quiz.currentQuestionText}
+        micSelected={!!selectedDeviceId}
+        onStartQuiz={quiz.startQuiz}
+        onSendAnswer={quiz.sendAnswer}
+        onNextQuestion={quiz.nextQuestion}
+      />
 
       {!isModelLoaded && <LoadingOverlay />}
     </div>

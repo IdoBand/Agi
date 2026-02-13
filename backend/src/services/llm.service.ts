@@ -22,10 +22,10 @@ export class LLMService implements ILLMService {
     logger.info(`LLM Service initialized with model: ${config.ollama.model}`);
   }
 
-  async chat(messages: ChatMessage[]): Promise<string> {
+  async chat(messages: ChatMessage[], systemPrompt?: string): Promise<string> {
     try {
       const langchainMessages = [
-        new SystemMessage(SYSTEM_PROMPT),
+        new SystemMessage(systemPrompt ?? SYSTEM_PROMPT),
         ...messages.map((msg) =>
           msg.role === 'user'
             ? new HumanMessage(msg.content)

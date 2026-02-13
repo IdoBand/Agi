@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir \"C:\\\\Users\\\\USER\\\\Desktop\\\\projects\\\\agi\\\\backend\\\\bin\\\\whisper\\\\models\"\")",
+      "Bash(python3:*)"
+    ]
+  }
+}

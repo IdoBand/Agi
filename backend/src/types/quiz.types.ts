@@ -9,6 +9,7 @@ export interface Question {
 export interface QuizQuestion {
   index: number;
   text: string;
+  answer: string;
   audio: string;
   lipsync: LipsyncData;
   facialExpression: FacialExpression;

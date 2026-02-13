@@ -65,6 +65,15 @@ export async function deleteTempFile(filepath: string): Promise<void> {
   }
 }
 
+export async function deleteWorkflowDir(ctx: WorkflowContext): Promise<void> {
+  try {
+    const dir = path.join(config.paths.temp, ctx.workflowId);
+    await fs.rm(dir, { recursive: true, force: true });
+  } catch {
+    // Ignore errors
+  }
+}
+
 export async function readFileAsBase64(filepath: string): Promise<string> {
   const buffer = await fs.readFile(filepath);
   return buffer.toString('base64');

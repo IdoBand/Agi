@@ -35,10 +35,10 @@ export function Experience({ currentMessage, onAudioEnd }: ExperienceProps) {
 
       {/* Camera Controls */}
       <OrbitControls
-        target={[0, 0, 0]}
+        target={[0, 0.75, 0]}
         enablePan={false}
-        minDistance={1.5}
-        maxDistance={4}
+        minDistance={0.8}
+        maxDistance={2}
         minPolarAngle={Math.PI / 4}
         maxPolarAngle={Math.PI / 2}
       />

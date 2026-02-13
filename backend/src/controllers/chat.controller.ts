@@ -5,7 +5,7 @@ import { lipsyncService } from '../services/lipsync.service.js';
 import { ChatMessage, ChatResponse, FacialExpression } from '../types/message.types.js';
 import { ChatRequest, TextChatRequest } from '../types/request.types.js';
 import { logger } from '../utils/logger.js';
-import { deleteTempFile, readFileAsBase64, WorkflowContext, createWorkflowContext, createWorkflowFile } from '../utils/file.utils.js';
+import { deleteTempFile, deleteWorkflowDir, readFileAsBase64, WorkflowContext, createWorkflowContext, createWorkflowFile } from '../utils/file.utils.js';
 
 // In-memory conversation history (for demo purposes)
 // In production, use a database or session storage
@@ -97,17 +97,16 @@ export async function handleVoiceChat(
       facialExpression: expression,
     };
 
-    // Cleanup temp files - DISABLED FOR TESTING
-    // await deleteTempFile(audioFile.path);
-    // await deleteTempFile(audioPath);
-
     logger.info('Voice chat response sent');
     res.json(response);
+
+    await deleteTempFile(audioFile.path);
+    await deleteTempFile(audioPath);
+    await deleteWorkflowDir(ctx);
   } catch (error) {
-    // Cleanup on error - DISABLED FOR TESTING
-    // if (audioFile?.path) {
-    //   await deleteTempFile(audioFile.path);
-    // }
+    if (audioFile?.path) {
+      await deleteTempFile(audioFile.path);
+    }
     next(error);
   }
 }
@@ -164,11 +163,11 @@ export async function handleTextChat(
       facialExpression: expression,
     };
 
-    // Cleanup - DISABLED FOR TESTING (workflow dirs handle organization now)
-    // await deleteTempFile(audioPath);
-
     logger.info('Text chat response sent');
     res.json(response);
+
+    await deleteTempFile(audioPath);
+    await deleteWorkflowDir(ctx);
   } catch (error) {
     next(error);
   }

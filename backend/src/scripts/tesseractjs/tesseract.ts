@@ -4,7 +4,7 @@ import fs from "fs";
 
 const imagesDir = path.join(__dirname, 'images');
 
-// npx tsx ./src/tesseractjs/tesseract.ts
+// npx tsx ./src/scripts/tesseractjs/tesseract.ts
 async function main() {
 
     // images from url

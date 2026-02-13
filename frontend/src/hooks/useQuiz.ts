@@ -1,7 +1,13 @@
 import { useState, useCallback, useEffect } from 'react';
-import { useVoiceRecorder } from './useVoiceRecorder';
 import { Message } from '../types/message.types';
 import { QuizPhase, QuizQuestion, QuizEvaluateResponse } from '../types/quiz.types';
+
+interface VoiceRecorderInput {
+  isRecording: boolean;
+  selectedDeviceId: string | null;
+  startRecording: () => Promise<void>;
+  stopRecording: () => Promise<Blob | null>;
+}
 
 interface UseQuizReturn {
   phase: QuizPhase;
@@ -11,16 +17,14 @@ interface UseQuizReturn {
   totalQuestions: number;
   result: QuizEvaluateResponse | null;
   score: number;
-  devices: MediaDeviceInfo[];
-  selectedDeviceId: string | null;
-  setSelectedDeviceId: (id: string) => void;
+  currentQuestionText: string;
   startQuiz: () => void;
   sendAnswer: () => void;
   nextQuestion: () => void;
   onQuestionAudioEnd: () => void;
 }
 
-export function useQuiz(): UseQuizReturn {
+export function useQuiz(recorder: VoiceRecorderInput): UseQuizReturn {
   const [phase, setPhase] = useState<QuizPhase>('idle');
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -29,14 +33,7 @@ export function useQuiz(): UseQuizReturn {
   const [currentMessage, setCurrentMessage] = useState<Message | null>(null);
   const [score, setScore] = useState(0);
 
-  const {
-    isRecording,
-    devices,
-    selectedDeviceId,
-    setSelectedDeviceId,
-    startRecording: recorderStart,
-    stopRecording: recorderStop,
-  } = useVoiceRecorder();
+  const { isRecording, selectedDeviceId, startRecording: recorderStart, stopRecording: recorderStop } = recorder;
 
   const playQuestion = useCallback((question: QuizQuestion) => {
     setCurrentMessage({
@@ -81,7 +78,6 @@ export function useQuiz(): UseQuizReturn {
       if (e.key.toLowerCase() !== 't') return;
       if (e.repeat) return;
 
-      // Only allow recording in listening or recorded phases
       if (phase === 'listening' || phase === 'recorded') {
         if (!isRecording && selectedDeviceId) {
           e.preventDefault();
@@ -119,6 +115,7 @@ export function useQuiz(): UseQuizReturn {
       const formData = new FormData();
       formData.append('audio', recordedBlob, 'recording.webm');
       formData.append('questionText', questions[currentIndex].text);
+      formData.append('correctAnswer', questions[currentIndex].answer);
 
       const res = await fetch('/quiz/evaluate', {
         method: 'POST',
@@ -158,9 +155,7 @@ export function useQuiz(): UseQuizReturn {
     totalQuestions: questions.length,
     result,
     score,
-    devices,
-    selectedDeviceId,
-    setSelectedDeviceId,
+    currentQuestionText: questions[currentIndex]?.text ?? '',
     startQuiz,
     sendAnswer,
     nextQuestion,

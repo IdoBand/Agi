@@ -60,9 +60,8 @@ export class LipsyncService {
       // Return empty lipsync data on error
       return { mouthCues: [] };
     } finally {
-      // DISABLED FOR TESTING
-      // if (wavPath) await deleteTempFile(wavPath);
-      // await deleteTempFile(outputPath);
+      if (wavPath) await deleteTempFile(wavPath);
+      await deleteTempFile(outputPath);
     }
   }
 }

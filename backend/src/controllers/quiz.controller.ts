@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { ChatRequest } from '../types/request.types.js';
-import { WorkflowContext } from '../utils/file.utils.js';
+import { WorkflowContext, deleteWorkflowDir } from '../utils/file.utils.js';
 import { getRandomQuestions, getFirstQuestions, evaluateAnswer } from '../services/quiz.service.js';
 import { logger } from '../utils/logger.js';
 
@@ -39,9 +39,15 @@ export async function handleQuizEvaluate(
 ): Promise<void> {
   const audioFile = req.file;
   const questionText = req.body?.questionText as string | undefined;
+  const correctAnswer = req.body?.correctAnswer as string | undefined;
 
   if (!questionText) {
     res.status(400).json({ error: 'questionText is required' });
+    return;
+  }
+
+  if (!correctAnswer) {
+    res.status(400).json({ error: 'correctAnswer is required' });
     return;
   }
 
@@ -52,9 +58,10 @@ export async function handleQuizEvaluate(
 
   try {
     const ctx: WorkflowContext = { workflowId: req.workflowId! };
-    const result = await evaluateAnswer(audioFile.path, questionText, ctx);
+    const result = await evaluateAnswer(audioFile.path, questionText, correctAnswer, ctx);
     logger.info(`Quiz eval: correct=${result.correct}`);
     res.json(result);
+    await deleteWorkflowDir(ctx);
   } catch (error) {
     next(error);
   }

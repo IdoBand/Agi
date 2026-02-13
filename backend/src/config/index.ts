@@ -18,7 +18,7 @@ export const config = {
 
   whisper: {
     path: process.env.WHISPER_PATH || './bin/whisper/whisper-cli.exe',
-    modelPath: process.env.WHISPER_MODEL_PATH || './bin/whisper/models/ggml-small.bin',
+    modelPath: process.env.WHISPER_MODEL_PATH || './bin/whisper/models/ggml-medium.bin',
   },
 
   paths: {

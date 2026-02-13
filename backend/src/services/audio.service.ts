@@ -58,11 +58,11 @@ export class AudioService implements ISTTService, ITTSService {
         await fs.copyFile(txtPath, destPath);
       }
 
-      // Cleanup temp files - DISABLED FOR TESTING
-      // if (wavPath !== audioPath) {
-      //   await deleteTempFile(wavPath);
-      // }
-      // await deleteTempFile(txtPath);
+      // Clean up converted WAV and whisper .txt output
+      if (wavPath !== audioPath) {
+        await deleteTempFile(wavPath);
+      }
+      await deleteTempFile(txtPath);
 
       const result = transcription.trim();
       logger.debug(`Transcription: ${result}`);
@@ -105,12 +105,14 @@ export class AudioService implements ISTTService, ITTSService {
     try {
       logger.debug(`Synthesizing text: ${text.substring(0, 50)}...`);
 
-      const audioStream = await this.elevenLabs.textToSpeech.convert(config.elevenLabs.voiceId,{
-        text,
-        modelId: 'eleven_multilingual_v2',
-        voiceSettings: {
-          
-        }
+      const audioStream = await this.elevenLabs.textToSpeech.convert(
+        config.elevenLabs.voiceId,
+{
+          text,
+          modelId: 'eleven_multilingual_v2',
+          voiceSettings: {
+            
+          }
       });
 
       // Convert stream to buffer
