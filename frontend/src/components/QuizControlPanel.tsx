@@ -1,5 +1,21 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { QuizPhase, QuizEvaluateResponse } from '../types/quiz.types';
+
+function EvaluationTimer({ startTime }: { startTime: number }) {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    setElapsed(Math.floor((Date.now() - startTime) / 1000));
+    const id = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startTime) / 1000));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [startTime]);
+
+  const minutes = Math.floor(elapsed / 60);
+  const seconds = elapsed % 60;
+  return <span className="font-mono text-gray-400">{minutes}:{seconds.toString().padStart(2, '0')}</span>;
+}
 
 interface QuizControlPanelProps {
   phase: QuizPhase;
@@ -10,9 +26,14 @@ interface QuizControlPanelProps {
   score: number;
   currentQuestionText: string;
   micSelected: boolean;
+  isAudioPlaying: boolean;
+  hasRecordedAnswer: boolean;
+  evaluationStartTime: number | null;
   onStartQuiz: () => void;
   onSendAnswer: () => void;
   onNextQuestion: () => void;
+  onReplayQuestion: () => void;
+  onPlayRecordedAnswer: () => void;
 }
 
 export function QuizControlPanel({
@@ -24,9 +45,14 @@ export function QuizControlPanel({
   score,
   currentQuestionText,
   micSelected,
+  isAudioPlaying,
+  hasRecordedAnswer,
+  evaluationStartTime,
   onStartQuiz,
   onSendAnswer,
   onNextQuestion,
+  onReplayQuestion,
+  onPlayRecordedAnswer,
 }: QuizControlPanelProps) {
   const [showQuestionText, setShowQuestionText] = useState(false);
   const isLastQuestion = currentIndex >= totalQuestions - 1;
@@ -110,14 +136,27 @@ export function QuizControlPanel({
         )}
 
         {phase === 'listening' && (
-          <div className="flex items-center justify-center gap-3">
+          <div className="flex flex-col items-center gap-2">
             {isRecording ? (
               <div className="flex items-center gap-3 text-red-400">
                 <div className="w-3 h-3 bg-red-400 rounded-full animate-pulse" />
                 <span className="font-medium">Recording... Release T to stop</span>
               </div>
             ) : (
-              <span className="text-gray-300 font-medium">Hold T to record your answer</span>
+              <>
+                <span className="text-gray-300 font-medium">Hold T to record your answer</span>
+                <button
+                  onClick={onReplayQuestion}
+                  disabled={isAudioPlaying}
+                  className={`text-sm px-4 py-1.5 rounded-full transition-colors ${
+                    isAudioPlaying
+                      ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                      : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                  }`}
+                >
+                  Replay Question
+                </button>
+              </>
             )}
           </div>
         )}
@@ -137,6 +176,30 @@ export function QuizControlPanel({
                 >
                   Send Answer
                 </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={onReplayQuestion}
+                    disabled={isAudioPlaying}
+                    className={`text-sm px-4 py-1.5 rounded-full transition-colors ${
+                      isAudioPlaying
+                        ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                        : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                    }`}
+                  >
+                    Replay Question
+                  </button>
+                  <button
+                    onClick={onPlayRecordedAnswer}
+                    disabled={isAudioPlaying || !hasRecordedAnswer}
+                    className={`text-sm px-4 py-1.5 rounded-full transition-colors ${
+                      isAudioPlaying || !hasRecordedAnswer
+                        ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                        : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                    }`}
+                  >
+                    Play Answer
+                  </button>
+                </div>
                 <span className="text-gray-500 text-xs">or hold T to re-record</span>
               </>
             )}
@@ -147,6 +210,7 @@ export function QuizControlPanel({
           <div className="flex items-center justify-center gap-3 text-white">
             <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
             <span className="font-medium">Evaluating...</span>
+            {evaluationStartTime != null && <EvaluationTimer startTime={evaluationStartTime} />}
           </div>
         )}
 

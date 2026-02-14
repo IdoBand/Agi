@@ -1,5 +1,6 @@
 import { ChatOpenAI } from '@langchain/openai';
 import { HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages';
+import { createAgent, providerStrategy } from 'langchain';
 import { z } from 'zod';
 import { config } from '../config/index.js';
 import { ChatMessage } from '../types/message.types.js';
@@ -53,21 +54,24 @@ export class ChatGPTService implements ILLMService {
 
   async chatWithSchema<T extends z.ZodObject>(messages: ChatMessage[], systemPrompt: string, schema: T): Promise<z.infer<T>> {
     try {
-      const langchainMessages = [
-        new SystemMessage(systemPrompt),
-        ...messages.map((msg) =>
-          msg.role === 'user'
-            ? new HumanMessage(msg.content)
-            : new AIMessage(msg.content)
-        ),
+      const formattedMessages = [
+        { role: 'system' as const, content: systemPrompt },
+        ...messages.map((msg) => ({
+          role: msg.role as 'user' | 'assistant',
+          content: msg.content,
+        })),
       ];
 
-      const structuredModel = this.model.withStructuredOutput(schema);
+      const agent = createAgent({
+        model: `openai:${config.openai.model}`,
+        tools: [],
+        responseFormat: providerStrategy(schema),
+      });
 
       logger.debug(`Sending ${messages.length} messages to ChatGPT (structured)`);
-      const result = await structuredModel.invoke(langchainMessages);
+      const result = await agent.invoke({ messages: formattedMessages });
 
-      return result as z.infer<T>;
+      return (result as unknown as { structuredResponse: z.infer<T> }).structuredResponse;
     } catch (error) {
       logger.error(`ChatGPT structured output error: ${error}`);
       throw new Error('Failed to get structured response from ChatGPT');

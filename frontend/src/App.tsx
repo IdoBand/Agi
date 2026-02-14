@@ -87,9 +87,14 @@ export default function App() {
         score={quiz.score}
         currentQuestionText={quiz.currentQuestionText}
         micSelected={!!selectedDeviceId}
+        isAudioPlaying={quiz.isAudioPlaying}
+        hasRecordedAnswer={quiz.hasRecordedAnswer}
+        evaluationStartTime={quiz.evaluationStartTime}
         onStartQuiz={quiz.startQuiz}
         onSendAnswer={quiz.sendAnswer}
         onNextQuestion={quiz.nextQuestion}
+        onReplayQuestion={quiz.replayQuestionAudio}
+        onPlayRecordedAnswer={quiz.playRecordedAnswer}
       />
 
       {!isModelLoaded && <LoadingOverlay />}
