@@ -71,6 +71,12 @@ export async function getFirstQuestions(count: number): Promise<QuizQuestion[]> 
   return Promise.all(selected.map((q, i) => loadQuestionAudio(q, i)));
 }
 
+export async function getShuffledQuestions(count: number): Promise<QuizQuestion[]> {
+  const questions = await loadQuestions();
+  const selected = shuffle(questions.slice(0, count));
+  return Promise.all(selected.map((q, i) => loadQuestionAudio(q, i)));
+}
+
 const EVAL_SYSTEM_PROMPT = `Te egy kvíz értékelő asszisztens vagy. A felhasználó egy kérdésre válaszolt szóban (beszédfelismeréssel átiratva).
 
 Szabályok:

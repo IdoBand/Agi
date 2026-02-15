@@ -49,7 +49,7 @@ async function main(): Promise<void> {
     logger.info(`[${i + 1}/${subset.length}] Generating audio for: "${q.question}"`);
 
     // TTS
-    const audioBuffer = await audioService.synthesize(`${q.question}`);
+    const audioBuffer = await audioService.synthesize(`[calm, formal examiner tone] ${q.question}`);
     await fs.writeFile(mp3Path, audioBuffer);
     logger.info(`  Saved MP3: ${mp3Path}`);
 

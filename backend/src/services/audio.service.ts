@@ -109,11 +109,8 @@ export class AudioService implements ISTTService, ITTSService {
         config.elevenLabs.voiceId,
 {
           text,
-          modelId: 'eleven_multilingual_v2',
-          voiceSettings: {
-            
-          }
-      });
+          modelId: 'eleven_v3',
+        });
 
       // Convert stream to buffer
       const chunks: Buffer[] = [];
