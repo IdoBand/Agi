@@ -25,6 +25,7 @@ interface QuizControlPanelProps {
   result: QuizEvaluateResponse | null;
   score: number;
   currentQuestionText: string;
+  currentEnglishTranslation: string;
   micSelected: boolean;
   isAudioPlaying: boolean;
   hasRecordedAnswer: boolean;
@@ -44,6 +45,7 @@ export function QuizControlPanel({
   result,
   score,
   currentQuestionText,
+  currentEnglishTranslation,
   micSelected,
   isAudioPlaying,
   hasRecordedAnswer,
@@ -224,6 +226,11 @@ export function QuizControlPanel({
                 <div className="text-gray-400 text-sm mb-1">You said: &quot;{result.userTranscript}&quot;</div>
               )}
               <div className="text-gray-300 text-sm">{result.explanation}</div>
+              {currentEnglishTranslation && (
+                <div className="text-gray-400 text-xs mt-2 italic border-t border-gray-600 pt-2">
+                  Translation: {currentEnglishTranslation}
+                </div>
+              )}
             </div>
             <button
               onClick={onNextQuestion}

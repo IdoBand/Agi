@@ -14,6 +14,7 @@ export interface QuizQuestion {
   index: number;
   text: string;
   answer: string;
+  englishTranslation: string;
   audio: string;
   lipsync: LipsyncData;
   facialExpression: FacialExpression;

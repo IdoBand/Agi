@@ -86,6 +86,7 @@ export default function App() {
         result={quiz.result}
         score={quiz.score}
         currentQuestionText={quiz.currentQuestionText}
+        currentEnglishTranslation={quiz.currentEnglishTranslation}
         micSelected={!!selectedDeviceId}
         isAudioPlaying={quiz.isAudioPlaying}
         hasRecordedAnswer={quiz.hasRecordedAnswer}

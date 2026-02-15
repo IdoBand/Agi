@@ -53,6 +53,7 @@ async function loadQuestionAudio(question: Question, index: number): Promise<Qui
     index,
     text: question.question,
     answer: question.answer,
+    englishTranslation: question.englishTranslation,
     audio,
     lipsync,
     facialExpression: 'default',
