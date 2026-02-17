@@ -2,6 +2,10 @@
 backend/bin/rhubarb/
 backend/bin/ffmpeg/
 
+
+orderedQuestions.json
+
+
 # Dependencies
 node_modules/
 .pnpm-store/

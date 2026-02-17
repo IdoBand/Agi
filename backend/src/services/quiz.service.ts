@@ -14,7 +14,7 @@ const EvalResponseSchema = z.object({
   explanation: z.string(),
 });
 
-const QUESTIONS_PATH = path.resolve('src/scripts/tesseractjs/questions.json');
+const QUESTIONS_PATH = path.resolve('src/scripts/tesseractjs/orderedQuestions.json');
 const AUDIO_DIR = path.resolve('assets/questionsAudio');
 
 let questionsCache: Question[] | null = null;
@@ -54,6 +54,7 @@ async function loadQuestionAudio(question: Question, index: number): Promise<Qui
     text: question.question,
     answer: question.answer,
     englishTranslation: question.englishTranslation,
+    category: question.category,
     audio,
     lipsync,
     facialExpression: 'default',

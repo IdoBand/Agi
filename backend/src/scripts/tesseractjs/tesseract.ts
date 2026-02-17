@@ -15,9 +15,13 @@ async function main() {
         //     await worker.terminate();
         // })();
 
-    const files = fs.readdirSync(imagesDir).filter((f: string) =>
-        /\.(jpe?g|png|webp|gif)$/i.test(f)
-    );
+    const files = fs.readdirSync(imagesDir)
+        .filter((f: string) => /\.(jpe?g|png|webp|gif)$/i.test(f))
+        .sort((a: string, b: string) => {
+            const numA = parseInt(a.match(/\d+/)?.[0] ?? '0', 10);
+            const numB = parseInt(b.match(/\d+/)?.[0] ?? '0', 10);
+            return numA - numB;
+        });
 
     const outputPath = path.join(__dirname, 'output.md');
     fs.writeFileSync(outputPath, '');

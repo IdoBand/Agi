@@ -5,6 +5,7 @@ export interface Question {
   question: string;
   answer: string;
   englishTranslation: string;
+  category: string;
 }
 
 export interface QuizQuestion {
@@ -12,6 +13,7 @@ export interface QuizQuestion {
   text: string;
   answer: string;
   englishTranslation: string;
+  category: string;
   audio: string;
   lipsync: LipsyncData;
   facialExpression: FacialExpression;

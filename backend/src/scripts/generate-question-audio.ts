@@ -13,7 +13,7 @@ import { logger } from '../utils/logger.js';
 import { Question } from '../types/quiz.types.js';
 
 const BACKEND_ROOT = path.resolve(__dirname, '../..');
-const QUESTIONS_PATH = path.resolve(__dirname, 'tesseractjs/questions.json');
+const QUESTIONS_PATH = path.resolve(__dirname, 'tesseractjs/orderedQuestions.json');
 const OUTPUT_DIR = path.resolve(BACKEND_ROOT, 'assets/questionsAudio');
 
 async function main(): Promise<void> {

@@ -26,6 +26,7 @@ interface QuizControlPanelProps {
   score: number;
   currentQuestionText: string;
   currentEnglishTranslation: string;
+  currentCategory: string;
   micSelected: boolean;
   isAudioPlaying: boolean;
   hasRecordedAnswer: boolean;
@@ -46,6 +47,7 @@ export function QuizControlPanel({
   score,
   currentQuestionText,
   currentEnglishTranslation,
+  currentCategory,
   micSelected,
   isAudioPlaying,
   hasRecordedAnswer,
@@ -222,6 +224,12 @@ export function QuizControlPanel({
               <div className={`font-bold text-lg mb-1 ${result.correct ? 'text-green-400' : 'text-red-400'}`}>
                 {result.correct ? 'Correct!' : 'Incorrect'}
               </div>
+              {currentQuestionText && (
+                <div className="text-gray-300 text-sm mb-1">{currentQuestionText}</div>
+              )}
+              {currentCategory && (
+                <div className="text-blue-400 text-xs mb-1 font-medium">Category: {currentCategory}</div>
+              )}
               {result.userTranscript && (
                 <div className="text-gray-400 text-sm mb-1">You said: &quot;{result.userTranscript}&quot;</div>
               )}

@@ -19,6 +19,7 @@ interface UseQuizReturn {
   score: number;
   currentQuestionText: string;
   currentEnglishTranslation: string;
+  currentCategory: string;
   isAudioPlaying: boolean;
   hasRecordedAnswer: boolean;
   evaluationStartTime: number | null;
@@ -215,6 +216,7 @@ export function useQuiz(recorder: VoiceRecorderInput): UseQuizReturn {
     score,
     currentQuestionText: questions[currentIndex]?.text ?? '',
     currentEnglishTranslation: questions[currentIndex]?.englishTranslation ?? '',
+    currentCategory: questions[currentIndex]?.category ?? '',
     isAudioPlaying,
     hasRecordedAnswer: !!recordedBlob,
     evaluationStartTime,
