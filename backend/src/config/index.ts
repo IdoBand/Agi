@@ -23,7 +23,10 @@ export const config = {
 
   whisper: {
     path: process.env.WHISPER_PATH || './bin/whisper/whisper-cli.exe',
+    serverPath: process.env.WHISPER_SERVER_PATH || './bin/whisper/whisper-server.exe',
     modelPath: process.env.WHISPER_MODEL_PATH || './bin/whisper/models/ggml-medium.bin',
+    // modelPath: process.env.WHISPER_MODEL_PATH || './bin/whisper/models/ggml-large-v3.bin',
+    serverPort: parseInt(process.env.WHISPER_SERVER_PORT || '8178', 10),
   },
 
   paths: {

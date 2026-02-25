@@ -1,4 +1,4 @@
-import { exec } from 'child_process';
+import { exec, spawn, ChildProcess } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import fs from 'fs/promises';
@@ -14,61 +14,98 @@ const execAsync = promisify(exec);
 export class AudioService implements ISTTService, ITTSService {
   private elevenLabs: ElevenLabsClient;
   private ffmpegPath: string;
+  private whisperServerProcess: ChildProcess | null = null;
 
   constructor() {
     this.elevenLabs = new ElevenLabsClient({
       apiKey: config.elevenLabs.apiKey,
     });
     this.ffmpegPath = config.paths.ffmpeg;
+    this.startWhisperServer();
     logger.info('Audio Service initialized');
   }
 
-  /**
-   * Transcribe audio to text using Whisper CLI
-   * Requires: pip install openai-whisper
-   */
+  private startWhisperServer(): void {
+    logger.info(`Starting whisper-server on port ${config.whisper.serverPort}...`);
+    this.whisperServerProcess = spawn(
+      config.whisper.serverPath,
+      ['-m', config.whisper.modelPath, '-l', 'hu', '--port', String(config.whisper.serverPort), '--host', '127.0.0.1'],
+      { stdio: ['ignore', 'pipe', 'pipe'] }
+    );
+
+    this.whisperServerProcess.stdout?.on('data', (d: Buffer) => {
+      logger.debug(`whisper-server: ${d.toString()}`);
+    });
+
+    this.whisperServerProcess.stderr?.on('data', (d: Buffer) => {
+      logger.debug(`whisper-server: ${d.toString()}`);
+    });
+
+    this.whisperServerProcess.on('exit', (code) => {
+      logger.warn(`Whisper server exited with code ${code}`);
+      this.whisperServerProcess = null;
+    });
+  }
+
+  private async waitForWhisperServer(timeoutMs = 90000): Promise<void> {
+    const url = `http://127.0.0.1:${config.whisper.serverPort}/health`;
+    const start = Date.now();
+    while (true) {
+      if (Date.now() - start > timeoutMs) {
+        throw new Error('Whisper server did not become ready in time');
+      }
+      try {
+        const res = await fetch(url);
+        if (res.ok) {
+          const json = await res.json() as { status: string };
+          if (json.status === 'ok') {
+            logger.info('Whisper server ready');
+            return;
+          }
+        }
+      } catch {
+        // server not up yet
+      }
+      await new Promise(r => setTimeout(r, 500));
+    }
+  }
+
   async transcribe(audioPath: string, ctx?: WorkflowContext): Promise<string> {
     try {
-      // Convert to WAV if needed (Whisper works best with WAV)
       const wavPath = await this.convertToWav(audioPath, ctx);
 
-      // Run whisper.cpp with Hungarian language
-      // Use relative path - whisper.cpp outputs relative to input path
-      const relativeWavPath = path.relative(process.cwd(), wavPath);
-      const command = `"${config.whisper.path}" -m "${config.whisper.modelPath}" -f "${relativeWavPath}" -l hu -t 6 -otxt`;
+      await this.waitForWhisperServer();
 
-      logger.debug(`Running Whisper: ${command}`);
-      logger.debug(`CWD: ${process.cwd()}`);
-      const { stdout, stderr } = await execAsync(command, { timeout: 120000, cwd: process.cwd() });
-      if (stdout) logger.debug(`Whisper stdout: ${stdout}`);
-      if (stderr) logger.debug(`Whisper stderr: ${stderr}`);
+      const fileBuffer = await fs.readFile(wavPath);
+      const blob = new Blob([fileBuffer], { type: 'audio/wav' });
+      const form = new FormData();
+      form.append('file', blob, path.basename(wavPath));
+      form.append('language', 'hu');
+      form.append('response_format', 'json');
 
-      // Debug: list temp folder contents
-      const tempFiles = await fs.readdir(config.paths.temp);
-      logger.debug(`Temp folder contents: ${tempFiles.filter(f => f.includes('.txt'))}`);
+      logger.debug(`Sending audio to whisper-server at port ${config.whisper.serverPort}`);
+      const response = await fetch(`http://127.0.0.1:${config.whisper.serverPort}/inference`, {
+        method: 'POST',
+        body: form,
+      });
 
-      // Read the transcription output (whisper.cpp appends .txt to relative path)
-      const txtPath = relativeWavPath + '.txt';
-      logger.debug(`Looking for: ${txtPath}`);
-      const transcription = await fs.readFile(txtPath, 'utf-8');
-
-      // Copy transcript to workflow dir if context provided
-      if (ctx) {
-        const destPath = await createWorkflowFile(ctx, 'input', 'transcript.txt');
-        await fs.copyFile(txtPath, destPath);
+      if (!response.ok) {
+        throw new Error(`Whisper server returned ${response.status}: ${await response.text()}`);
       }
 
-      // Clean up converted WAV and whisper .txt output
+      const json = await response.json() as { text: string };
+      const result = json.text.trim();
+
+      if (ctx) {
+        const destPath = await createWorkflowFile(ctx, 'input', 'transcript.txt');
+        await fs.writeFile(destPath, result);
+      }
+
       if (wavPath !== audioPath) {
         await deleteTempFile(wavPath);
       }
-      await deleteTempFile(txtPath);
-
-      const result = transcription.trim();
-      logger.debug(`Transcription: ${result}`);
 
       logger.info(`WHISPER STT RESULT: ${result}`);
-
       return result;
     } catch (error) {
       logger.error(`Transcription error: ${error}`);

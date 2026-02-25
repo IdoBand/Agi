@@ -99,6 +99,7 @@ export async function evaluateAnswer(
   correctAnswer: string,
   ctx?: WorkflowContext
 ): Promise<QuizEvaluateResponse> {
+  logger.debug(`[quiz-evaluate-svc] audioPath=${audioPath} questionText=${questionText} correctAnswer=${correctAnswer}`);
   // STT
   const userTranscript = await audioService.transcribe(audioPath, ctx);
   logger.info(`Quiz STT: "${userTranscript}"`);

@@ -176,7 +176,12 @@ export function QuizControlPanel({
               <>
                 <button
                   onClick={onSendAnswer}
-                  className="bg-green-600 hover:bg-green-700 text-white px-8 py-2.5 rounded-full font-medium transition-colors"
+                  disabled={isAudioPlaying}
+                  className={`px-8 py-2.5 rounded-full font-medium transition-colors ${
+                    isAudioPlaying
+                      ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                      : 'bg-green-600 hover:bg-green-700 text-white'
+                  }`}
                 >
                   Send Answer
                 </button>

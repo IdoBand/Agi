@@ -20,5 +20,9 @@ export const logger = winston.createLogger({
         logFormat
       ),
     }),
+    new winston.transports.File({
+      filename: 'logs/debug.log',
+      level: 'debug',
+    }),
   ],
 });

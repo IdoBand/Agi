@@ -25,7 +25,7 @@ export async function handleQuizStartTest(
 ): Promise<void> {
   try {
     logger.info('Starting quiz round (test/deterministic)');
-    const questions = await getShuffledQuestions(10);
+    const questions = await getShuffledQuestions(30);
     res.json({ questions });
   } catch (error) {
     next(error);
@@ -41,21 +41,29 @@ export async function handleQuizEvaluate(
   const questionText = req.body?.questionText as string | undefined;
   const correctAnswer = req.body?.correctAnswer as string | undefined;
 
+  logger.debug(`[quiz-evaluate] content-type: ${req.headers['content-type']}`);
+  logger.debug(`[quiz-evaluate] body: questionText=${questionText ? `present(${questionText.length})` : 'MISSING'}, correctAnswer=${correctAnswer ? `present(${correctAnswer.length})` : 'MISSING'}`);
+  logger.debug(`[quiz-evaluate] file: ${audioFile ? `name=${audioFile.originalname} mime=${audioFile.mimetype} size=${audioFile.size} path=${audioFile.path}` : 'NO FILE'}`);
+
   if (!questionText) {
+    logger.warn('[quiz-evaluate] 400: questionText missing');
     res.status(400).json({ error: 'questionText is required' });
     return;
   }
 
-  if (!correctAnswer) {
+  if (correctAnswer === undefined || correctAnswer === null) {
+    logger.warn('[quiz-evaluate] 400: correctAnswer missing');
     res.status(400).json({ error: 'correctAnswer is required' });
     return;
   }
 
   if (!audioFile) {
+    logger.warn('[quiz-evaluate] 400: audio file missing');
     res.status(400).json({ error: 'No audio file provided' });
     return;
   }
 
+  logger.info('Quiz evaluate request received');
   try {
     const ctx: WorkflowContext = { workflowId: req.workflowId! };
     const result = await evaluateAnswer(audioFile.path, questionText, correctAnswer, ctx);
