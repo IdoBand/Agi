@@ -4,8 +4,8 @@ import { Question, QuizQuestion, QuizEvaluateResponse } from '../types/quiz.type
 import { LipsyncData } from '../types/message.types.js';
 import { z } from 'zod';
 import { readFileAsBase64 } from '../utils/file.utils.js';
-import { audioService } from './audio.service.js';
-import { chatgptService } from './chatgpt.service.js';
+import { sttService } from './stt/stt.service.js';
+import { chatgptService } from './chat/chatgpt.service.js';
 import { logger } from '../utils/logger.js';
 import { WorkflowContext } from '../utils/file.utils.js';
 
@@ -101,7 +101,7 @@ export async function evaluateAnswer(
 ): Promise<QuizEvaluateResponse> {
   logger.debug(`[quiz-evaluate-svc] audioPath=${audioPath} questionText=${questionText} correctAnswer=${correctAnswer}`);
   // STT
-  const userTranscript = await audioService.transcribe(audioPath, ctx);
+  const userTranscript = await sttService.transcribe(audioPath, ctx);
   logger.info(`Quiz STT: "${userTranscript}"`);
 
   // Build eval prompt

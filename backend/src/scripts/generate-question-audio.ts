@@ -7,8 +7,8 @@ import path from 'path';
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 import fs from 'fs/promises';
-import { audioService } from '../services/audio.service.js';
-import { lipsyncService } from '../services/lipsync.service.js';
+import { ttsService } from '../services/tts/tts.service.js';
+import { lipsyncService } from '../services/lipsync/lipsync.service.js';
 import { logger } from '../utils/logger.js';
 import { Question } from '../types/quiz.types.js';
 
@@ -49,7 +49,7 @@ async function main(): Promise<void> {
     logger.info(`[${i + 1}/${subset.length}] Generating audio for: "${q.question}"`);
 
     // TTS
-    const audioBuffer = await audioService.synthesize(`[calm, formal examiner tone] ${q.question}`);
+    const audioBuffer = await ttsService.synthesize(`[calm, formal examiner tone] ${q.question}`);
     await fs.writeFile(mp3Path, audioBuffer);
     logger.info(`  Saved MP3: ${mp3Path}`);
 

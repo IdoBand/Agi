@@ -2,10 +2,10 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
 import path from 'path';
-import { config } from '../config/index.js';
-import { LipsyncData } from '../types/message.types.js';
-import { logger } from '../utils/logger.js';
-import { createTempFile, deleteTempFile, WorkflowContext, createWorkflowFile } from '../utils/file.utils.js';
+import { config } from '../../config/index.js';
+import { LipsyncData } from '../../types/message.types.js';
+import { logger } from '../../utils/logger.js';
+import { createTempFile, deleteTempFile, WorkflowContext, createWorkflowFile } from '../../utils/file.utils.js';
 
 const execAsync = promisify(exec);
 

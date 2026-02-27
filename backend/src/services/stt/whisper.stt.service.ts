@@ -2,27 +2,21 @@ import { exec, spawn, ChildProcess } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import fs from 'fs/promises';
-import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
-import { config } from '../config/index.js';
-import { ISTTService } from './interfaces/stt.interface.js';
-import { ITTSService } from './interfaces/tts.interface.js';
-import { logger } from '../utils/logger.js';
-import { createTempFile, deleteTempFile, WorkflowContext, createWorkflowFile } from '../utils/file.utils.js';
+import { config } from '../../config/index.js';
+import { ISTTService } from '../interfaces/stt.interface.js';
+import { logger } from '../../utils/logger.js';
+import { createTempFile, deleteTempFile, WorkflowContext, createWorkflowFile } from '../../utils/file.utils.js';
 
 const execAsync = promisify(exec);
 
-export class AudioService implements ISTTService, ITTSService {
-  private elevenLabs: ElevenLabsClient;
-  private ffmpegPath: string;
+export class WhisperSTTService implements ISTTService {
   private whisperServerProcess: ChildProcess | null = null;
+  private ffmpegPath: string;
 
   constructor() {
-    this.elevenLabs = new ElevenLabsClient({
-      apiKey: config.elevenLabs.apiKey,
-    });
     this.ffmpegPath = config.paths.ffmpeg;
     this.startWhisperServer();
-    logger.info('Audio Service initialized');
+    logger.info('Whisper STT Service initialized');
   }
 
   private startWhisperServer(): void {
@@ -70,6 +64,25 @@ export class AudioService implements ISTTService, ITTSService {
     }
   }
 
+  private async convertToWav(inputPath: string, ctx?: WorkflowContext): Promise<string> {
+    if (inputPath.endsWith('.wav')) {
+      return inputPath;
+    }
+
+    const outputPath = ctx
+      ? await createWorkflowFile(ctx, 'input', 'converted.wav')
+      : await createTempFile('.wav');
+
+    try {
+      const command = `"${this.ffmpegPath}" -i "${inputPath}" -ar 16000 -ac 1 -y "${outputPath}"`;
+      await execAsync(command);
+      return outputPath;
+    } catch (error) {
+      logger.error(`Audio conversion error: ${error}`);
+      throw new Error('Failed to convert audio format');
+    }
+  }
+
   async transcribe(audioPath: string, ctx?: WorkflowContext): Promise<string> {
     try {
       const wavPath = await this.convertToWav(audioPath, ctx);
@@ -112,69 +125,4 @@ export class AudioService implements ISTTService, ITTSService {
       throw new Error('Failed to transcribe audio');
     }
   }
-
-  /**
-   * Convert audio to WAV format using FFmpeg
-   */
-  private async convertToWav(inputPath: string, ctx?: WorkflowContext): Promise<string> {
-    if (inputPath.endsWith('.wav')) {
-      return inputPath;
-    }
-
-    const outputPath = ctx
-      ? await createWorkflowFile(ctx, 'input', 'converted.wav')
-      : await createTempFile('.wav');
-
-    try {
-      const command = `"${this.ffmpegPath}" -i "${inputPath}" -ar 16000 -ac 1 -y "${outputPath}"`;
-      await execAsync(command);
-      return outputPath;
-    } catch (error) {
-      logger.error(`Audio conversion error: ${error}`);
-      throw new Error('Failed to convert audio format');
-    }
-  }
-
-  /**
-   * Synthesize text to speech using ElevenLabs
-   */
-  async synthesize(text: string): Promise<Buffer> {
-    try {
-      logger.debug(`Synthesizing text: ${text.substring(0, 50)}...`);
-
-      const audioStream = await this.elevenLabs.textToSpeech.convert(
-        config.elevenLabs.voiceId,
-{
-          text,
-          modelId: 'eleven_v3',
-        });
-
-      // Convert stream to buffer
-      const chunks: Buffer[] = [];
-      for await (const chunk of audioStream) {
-        chunks.push(Buffer.from(chunk));
-      }
-
-      const audioBuffer = Buffer.concat(chunks);
-      logger.debug(`Generated audio: ${audioBuffer.length} bytes`);
-
-      return audioBuffer;
-    } catch (error) {
-      logger.error(`TTS error: ${error}`);
-      throw new Error('Failed to synthesize speech');
-    }
-  }
-
-  /**
-   * Save audio buffer to a temp file and return the path
-   */
-  async saveToFile(audioBuffer: Buffer, ctx?: WorkflowContext): Promise<string> {
-    const filePath = ctx
-      ? await createWorkflowFile(ctx, 'output', 'audio.mp3')
-      : await createTempFile('.mp3');
-    await fs.writeFile(filePath, audioBuffer);
-    return filePath;
-  }
 }
-
-export const audioService = new AudioService();

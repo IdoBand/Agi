@@ -3,8 +3,19 @@ import path from 'path';
 
 dotenv.config();
 
+export type STTProvider = 'whisper' | 'openai';
+
+function parseSTTProvider(value: string | undefined): STTProvider {
+  if (value === 'openai') return 'openai';
+  return 'whisper';
+}
+
 export const config = {
   port: parseInt(process.env.PORT || '3000', 10),
+
+  stt: {
+    provider: parseSTTProvider(process.env.STT_PROVIDER),
+  },
 
   ollama: {
     baseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
@@ -14,6 +25,7 @@ export const config = {
   openai: {
     apiKey: process.env.OPENAI_API_KEY || '',
     model: process.env.OPENAI_MODEL || 'gpt-4o',
+    sttModel: process.env.OPENAI_STT_MODEL || 'gpt-4o-mini-transcribe',
   },
 
   elevenLabs: {

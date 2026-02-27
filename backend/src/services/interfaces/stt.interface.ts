@@ -1,3 +1,5 @@
+import { WorkflowContext } from '../../utils/file.utils.js';
+
 export interface ISTTService {
-  transcribe(audioPath: string): Promise<string>;
+  transcribe(audioPath: string, ctx?: WorkflowContext): Promise<string>;
 }

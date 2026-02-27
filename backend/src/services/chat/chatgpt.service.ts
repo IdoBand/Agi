@@ -2,10 +2,10 @@ import { ChatOpenAI } from '@langchain/openai';
 import { HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages';
 import { createAgent, providerStrategy } from 'langchain';
 import { z } from 'zod';
-import { config } from '../config/index.js';
-import { ChatMessage } from '../types/message.types.js';
-import { ILLMService } from './interfaces/llm.interface.js';
-import { logger } from '../utils/logger.js';
+import { config } from '../../config/index.js';
+import { ChatMessage } from '../../types/message.types.js';
+import { ILLMService } from '../interfaces/llm.interface.js';
+import { logger } from '../../utils/logger.js';
 
 const SYSTEM_PROMPT = `Te egy kedves, segítőkész virtuális barátnő vagy. A neved Agi.
 Magyarul beszélsz, és mindig barátságos, szeretetteli hangnemben válaszolsz.

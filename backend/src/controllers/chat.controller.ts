@@ -1,7 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
-import { audioService } from '../services/audio.service.js';
-import { llmService } from '../services/llm.service.js';
-import { lipsyncService } from '../services/lipsync.service.js';
+import { sttService } from '../services/stt/stt.service.js';
+import { ttsService } from '../services/tts/tts.service.js';
+import { llmService } from '../services/chat/llm.service.js';
+import { lipsyncService } from '../services/lipsync/lipsync.service.js';
 import { ChatMessage, ChatResponse, FacialExpression } from '../types/message.types.js';
 import { ChatRequest, TextChatRequest } from '../types/request.types.js';
 import { logger } from '../utils/logger.js';
@@ -58,7 +59,7 @@ export async function handleVoiceChat(
     const ctx: WorkflowContext = { workflowId: req.workflowId! };
 
     // Step 1: Transcribe audio to text (STT)
-    const userText = await audioService.transcribe(audioFile.path, ctx);
+    const userText = await sttService.transcribe(audioFile.path, ctx);
     logger.info(`User said: ${userText}`);
 
     if (!userText || userText.trim() === '') {
@@ -80,8 +81,8 @@ export async function handleVoiceChat(
     await createWorkflowFile(ctx, 'output', 'response.txt', llmResponse);
 
     // Step 3: Synthesize response to audio (TTS)
-    const audioBuffer = await audioService.synthesize(llmResponse);
-    const audioPath = await audioService.saveToFile(audioBuffer, ctx);
+    const audioBuffer = await ttsService.synthesize(llmResponse);
+    const audioPath = await ttsService.saveToFile(audioBuffer, ctx);
 
     // Step 4: Generate lipsync data
     const lipsyncData = await lipsyncService.generateLipsync(audioPath, ctx);
@@ -146,8 +147,8 @@ export async function handleTextChat(
     await createWorkflowFile(ctx, 'output', 'response.txt', llmResponse);
 
     // Step 2: Synthesize response to audio (TTS)
-    const audioBuffer = await audioService.synthesize(llmResponse);
-    const audioPath = await audioService.saveToFile(audioBuffer, ctx);
+    const audioBuffer = await ttsService.synthesize(llmResponse);
+    const audioPath = await ttsService.saveToFile(audioBuffer, ctx);
 
     // Step 3: Generate lipsync data
     const lipsyncData = await lipsyncService.generateLipsync(audioPath, ctx);
