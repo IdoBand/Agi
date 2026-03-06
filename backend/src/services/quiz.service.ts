@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { readFileAsBase64 } from '../utils/file.utils.js';
 import { sttService } from './stt/stt.service.js';
 import { chatgptService } from './chat/chatgpt.service.js';
+import { transcribeAndEvaluate } from './gpt-multi-service/unified-eval.service.js';
 import { logger } from '../utils/logger.js';
 import { WorkflowContext } from '../utils/file.utils.js';
 
@@ -14,7 +15,8 @@ const EvalResponseSchema = z.object({
   explanation: z.string(),
 });
 
-const QUESTIONS_PATH = path.resolve('src/scripts/tesseractjs/orderedQuestions.json');
+const QUESTIONS_PATH = path.resolve('src/scripts/tesseractjs/images2Questions.json');
+// const QUESTIONS_PATH = path.resolve('src/scripts/tesseractjs/orderedQuestions.json');
 const AUDIO_DIR = path.resolve('assets/questionsAudio');
 
 let questionsCache: Question[] | null = null;
@@ -114,4 +116,14 @@ export async function evaluateAnswer(
   logger.info(`Quiz eval result: ${JSON.stringify(result)}`);
 
   return { correct: result.correct, explanation: result.explanation, userTranscript };
+}
+
+export async function evaluateAnswerUnified(
+  audioPath: string,
+  questionText: string,
+  correctAnswer: string,
+  ctx?: WorkflowContext
+): Promise<QuizEvaluateResponse> {
+  logger.debug(`[quiz-evaluate-unified] audioPath=${audioPath} questionText=${questionText} correctAnswer=${correctAnswer}`);
+  return transcribeAndEvaluate(audioPath, questionText, correctAnswer, ctx);
 }
