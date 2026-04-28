@@ -2,6 +2,7 @@ import { Canvas } from '@react-three/fiber';
 import { Suspense, useState } from 'react';
 import { Experience } from './components/Experience';
 import { QuizControlPanel } from './components/QuizControlPanel';
+import { QuizReviewCard } from './components/QuizReviewCard';
 import { useVoiceRecorder } from './hooks/useVoiceRecorder';
 import { useQuiz } from './hooks/useQuiz';
 
@@ -78,16 +79,25 @@ export default function App() {
         </select>
       </div>
 
+      {quiz.phase === 'result' && quiz.result && (
+        <div className="absolute top-20 left-4 z-10 max-w-sm">
+          <QuizReviewCard
+            result={quiz.result}
+            questionText={quiz.currentQuestionText}
+            englishTranslation={quiz.currentEnglishTranslation}
+            category={quiz.currentCategory}
+            correctAnswer={quiz.currentCorrectAnswer}
+          />
+        </div>
+      )}
+
       <QuizControlPanel
         phase={quiz.phase}
         isRecording={quiz.isRecording}
         currentIndex={quiz.currentIndex}
         totalQuestions={quiz.totalQuestions}
-        result={quiz.result}
         score={quiz.score}
         currentQuestionText={quiz.currentQuestionText}
-        currentEnglishTranslation={quiz.currentEnglishTranslation}
-        currentCategory={quiz.currentCategory}
         micSelected={!!selectedDeviceId}
         isAudioPlaying={quiz.isAudioPlaying}
         hasRecordedAnswer={quiz.hasRecordedAnswer}

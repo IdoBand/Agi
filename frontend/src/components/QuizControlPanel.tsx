@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { QuizPhase, QuizEvaluateResponse } from '../types/quiz.types';
+import { QuizPhase } from '../types/quiz.types';
 
 function EvaluationTimer({ startTime }: { startTime: number }) {
   const [elapsed, setElapsed] = useState(0);
@@ -22,11 +22,8 @@ interface QuizControlPanelProps {
   isRecording: boolean;
   currentIndex: number;
   totalQuestions: number;
-  result: QuizEvaluateResponse | null;
   score: number;
   currentQuestionText: string;
-  currentEnglishTranslation: string;
-  currentCategory: string;
   micSelected: boolean;
   isAudioPlaying: boolean;
   hasRecordedAnswer: boolean;
@@ -43,11 +40,8 @@ export function QuizControlPanel({
   isRecording,
   currentIndex,
   totalQuestions,
-  result,
   score,
   currentQuestionText,
-  currentEnglishTranslation,
-  currentCategory,
   micSelected,
   isAudioPlaying,
   hasRecordedAnswer,
@@ -91,7 +85,7 @@ export function QuizControlPanel({
 
   // All other phases: bottom panel
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-10 bg-gray-900/95 backdrop-blur-sm border-t border-gray-700 px-6 py-4">
+    <div className="fixed bottom-0 left-0 right-0 h-[140px] z-10 bg-gray-900/95 backdrop-blur-sm border-t border-gray-700 px-6 py-4">
       {/* Top row: score ratio + text toggle */}
       <div className="flex items-center justify-between mb-3">
         {totalQuestions > 0 ? (
@@ -223,28 +217,8 @@ export function QuizControlPanel({
           </div>
         )}
 
-        {phase === 'result' && result && (
-          <div className="flex flex-col items-center gap-3">
-            <div className={`${result.correct ? 'bg-green-600/20 border-green-600' : 'bg-red-600/20 border-red-600'} border rounded-xl px-5 py-3 max-w-md w-full`}>
-              <div className={`font-bold text-lg mb-1 ${result.correct ? 'text-green-400' : 'text-red-400'}`}>
-                {result.correct ? 'Correct!' : 'Incorrect'}
-              </div>
-              {currentQuestionText && (
-                <div className="text-gray-300 text-sm mb-1">{currentQuestionText}</div>
-              )}
-              {currentCategory && (
-                <div className="text-blue-400 text-xs mb-1 font-medium">Category: {currentCategory}</div>
-              )}
-              {result.userTranscript && (
-                <div className="text-gray-400 text-sm mb-1">You said: &quot;{result.userTranscript}&quot;</div>
-              )}
-              <div className="text-gray-300 text-sm">{result.explanation}</div>
-              {currentEnglishTranslation && (
-                <div className="text-gray-400 text-xs mt-2 italic border-t border-gray-600 pt-2">
-                  Translation: {currentEnglishTranslation}
-                </div>
-              )}
-            </div>
+        {phase === 'result' && (
+          <div className="flex flex-col items-center">
             <button
               onClick={onNextQuestion}
               className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-2.5 rounded-full font-medium transition-colors"

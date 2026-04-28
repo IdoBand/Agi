@@ -4,7 +4,10 @@
       "Bash(python3:*)",
       "Bash(test:*)",
       "Bash(npx tsc:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(npm install:*)",
+      "Bash(claude mcp *)",
+      "mcp__playwright__browser_navigate"
     ]
   }
 }
