@@ -86,3 +86,6 @@ venv/
 # Coverage/Testing
 coverage/
 .nyc_output/
+
+# Playwright MCP
+.playwright-mcp/

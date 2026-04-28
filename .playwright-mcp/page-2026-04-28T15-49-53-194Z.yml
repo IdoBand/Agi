@@ -1,7 +1,0 @@
-- generic [ref=e3]:
-  - combobox [ref=e8]:
-    - option "Select microphone" [disabled] [selected]
-  - generic [ref=e9]:
-    - button "Start Quiz" [disabled] [ref=e10]
-    - generic [ref=e11]: Select a microphone first
-  - generic [ref=e15]: Loading avatar...
