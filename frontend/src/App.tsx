@@ -48,27 +48,18 @@ export default function App() {
   const quiz = useQuiz({ isRecording, selectedDeviceId, startRecording, stopRecording });
 
   return (
-    <div className="w-full h-screen bg-gray-900 relative">
-      <Canvas
-        shadows
-        camera={{ position: [0, 1.0, 1.6], fov: 38 }}
-        className="w-full h-full"
+    <div className="w-full h-screen flex bg-black">
+      <aside
+        className="w-1/4 h-full border-r border-gray-700 flex flex-col gap-4 p-4 overflow-y-auto z-20"
+        style={{
+          background:
+            'linear-gradient(to bottom, #02152b 0%, #062a4a 25%, #1f4f7a 55%, #5f7fa0 75%, #c3b0b6 100%)',
+        }}
       >
-        <Suspense fallback={null}>
-          <SceneContent
-            currentMessage={quiz.currentMessage}
-            onAudioEnd={quiz.onQuestionAudioEnd}
-            onLoaded={() => setIsModelLoaded(true)}
-          />
-        </Suspense>
-      </Canvas>
-
-      {/* Microphone selector */}
-      <div className="absolute top-4 left-4 z-10 flex gap-2">
         <select
           value={selectedDeviceId || ''}
           onChange={(e) => setSelectedDeviceId(e.target.value)}
-          className="bg-gray-800 text-white px-3 py-2 rounded-lg border border-gray-600 focus:outline-none focus:border-blue-500"
+          className="w-full bg-gray-800 text-white px-3 py-2 rounded-lg border border-gray-600 focus:outline-none focus:border-blue-500"
         >
           <option value="" disabled>Select microphone</option>
           {devices.map((d) => (
@@ -77,10 +68,8 @@ export default function App() {
             </option>
           ))}
         </select>
-      </div>
 
-      {quiz.phase === 'result' && quiz.result && (
-        <div className="absolute top-20 left-4 z-10 max-w-sm">
+        {quiz.phase === 'result' && quiz.result && (
           <QuizReviewCard
             result={quiz.result}
             questionText={quiz.currentQuestionText}
@@ -88,28 +77,56 @@ export default function App() {
             category={quiz.currentCategory}
             correctAnswer={quiz.currentCorrectAnswer}
           />
+        )}
+
+        <div className="mt-auto">
+          <QuizControlPanel
+            phase={quiz.phase}
+            isRecording={quiz.isRecording}
+            currentIndex={quiz.currentIndex}
+            totalQuestions={quiz.totalQuestions}
+            score={quiz.score}
+            currentQuestionText={quiz.currentQuestionText}
+            micSelected={!!selectedDeviceId}
+            isAudioPlaying={quiz.isAudioPlaying}
+            hasRecordedAnswer={quiz.hasRecordedAnswer}
+            evaluationStartTime={quiz.evaluationStartTime}
+            onStartQuiz={quiz.startQuiz}
+            onSendAnswer={quiz.sendAnswer}
+            onNextQuestion={quiz.nextQuestion}
+            onReplayQuestion={quiz.replayQuestionAudio}
+            onPlayRecordedAnswer={quiz.playRecordedAnswer}
+          />
         </div>
-      )}
+      </aside>
 
-      <QuizControlPanel
-        phase={quiz.phase}
-        isRecording={quiz.isRecording}
-        currentIndex={quiz.currentIndex}
-        totalQuestions={quiz.totalQuestions}
-        score={quiz.score}
-        currentQuestionText={quiz.currentQuestionText}
-        micSelected={!!selectedDeviceId}
-        isAudioPlaying={quiz.isAudioPlaying}
-        hasRecordedAnswer={quiz.hasRecordedAnswer}
-        evaluationStartTime={quiz.evaluationStartTime}
-        onStartQuiz={quiz.startQuiz}
-        onSendAnswer={quiz.sendAnswer}
-        onNextQuestion={quiz.nextQuestion}
-        onReplayQuestion={quiz.replayQuestionAudio}
-        onPlayRecordedAnswer={quiz.playRecordedAnswer}
-      />
+      <div className="flex-1 h-full relative bg-black">
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background:
+              'radial-gradient(circle at center, rgba(255,255,255,0) 55%, rgba(255,255,255,0.7) 100%)',
+            zIndex: 0,
+          }}
+        />
 
-      {!isModelLoaded && <LoadingOverlay />}
+        <Canvas
+          shadows
+          camera={{ position: [0, 1.0, 1.6], fov: 38 }}
+          className="w-full h-full relative"
+          style={{ zIndex: 1 }}
+        >
+          <Suspense fallback={null}>
+            <SceneContent
+              currentMessage={quiz.currentMessage}
+              onAudioEnd={quiz.onQuestionAudioEnd}
+              onLoaded={() => setIsModelLoaded(true)}
+            />
+          </Suspense>
+        </Canvas>
+
+        {!isModelLoaded && <LoadingOverlay />}
+      </div>
     </div>
   );
 }
