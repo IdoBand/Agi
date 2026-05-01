@@ -6,6 +6,7 @@ import { handleVoiceChat, handleTextChat, clearHistory } from './controllers/cha
 import { ensureDir } from './utils/file.utils.js';
 import { config } from './config/index.js';
 import quizRoutes from './routes/quiz.routes.js';
+import tutorRoutes from './routes/tutor.routes.js';
 
 export async function createApp(): Promise<express.Application> {
   const app = express();
@@ -28,6 +29,9 @@ export async function createApp(): Promise<express.Application> {
 
   // Quiz routes
   app.use('/quiz', quizRoutes);
+
+  // Tutor routes
+  app.use('/tutor', tutorRoutes);
 
   // Chat routes
   app.post('/chat', uploadAudio, handleVoiceChat);

@@ -41,6 +41,15 @@ export const config = {
     serverPort: parseInt(process.env.WHISPER_SERVER_PORT || '8178', 10),
   },
 
+  anthropic: {
+    apiKey: process.env.ANTHROPIC_API_KEY || '',
+    model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6',
+  },
+
+  tutor: {
+    knowledgeDir: path.resolve(process.env.TUTOR_KNOWLEDGE_DIR || './knowledge'),
+  },
+
   paths: {
     rhubarb: process.env.RHUBARB_PATH || './bin/rhubarb/rhubarb.exe',
     ffmpeg: process.env.FFMPEG_PATH || './bin/ffmpeg/ffmpeg.exe',

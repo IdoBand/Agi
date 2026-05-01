@@ -9,6 +9,7 @@
     "start": "tsc && node dist/index.js"
   },
   "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.123",
     "@elevenlabs/elevenlabs-js": "^2.34.0",
     "@langchain/core": "^1.1.24",
     "@langchain/ollama": "^1.2.2",

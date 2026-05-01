@@ -83,7 +83,7 @@ export class WhisperSTTService implements ISTTService {
     }
   }
 
-  async transcribe(audioPath: string, ctx?: WorkflowContext): Promise<string> {
+  async transcribe(audioPath: string, ctx?: WorkflowContext, prompt?: string): Promise<string> {
     try {
       const wavPath = await this.convertToWav(audioPath, ctx);
 
@@ -95,6 +95,7 @@ export class WhisperSTTService implements ISTTService {
       form.append('file', blob, path.basename(wavPath));
       form.append('language', 'hu');
       form.append('response_format', 'json');
+      if (prompt) form.append('initial_prompt', prompt);
 
       logger.debug(`Sending audio to whisper-server at port ${config.whisper.serverPort}`);
       const response = await fetch(`http://127.0.0.1:${config.whisper.serverPort}/inference`, {

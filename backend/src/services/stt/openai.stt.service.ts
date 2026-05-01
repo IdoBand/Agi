@@ -14,12 +14,13 @@ export class OpenAISTTService implements ISTTService {
     logger.info('OpenAI STT Service initialized');
   }
 
-  async transcribe(audioPath: string, ctx?: WorkflowContext): Promise<string> {
+  async transcribe(audioPath: string, ctx?: WorkflowContext, prompt?: string): Promise<string> {
     try {
       const transcription = await this.openai.audio.transcriptions.create({
         file: fs.createReadStream(audioPath),
         model: config.openai.sttModel,
         language: 'hu',
+        ...(prompt ? { prompt } : {}),
       });
 
       const result = transcription.text.trim();

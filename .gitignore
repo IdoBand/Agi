@@ -89,3 +89,6 @@ coverage/
 
 # Playwright MCP
 .playwright-mcp/
+
+# Backend logs (all subdirs)
+backend/logs/**

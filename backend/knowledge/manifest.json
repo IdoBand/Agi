@@ -1,0 +1,16 @@
+{
+  "entries": [
+    {
+      "path": "greetings.md",
+      "title": "Greetings & introductions",
+      "summary": "Common Hungarian greetings, introductions, polite phrases.",
+      "tags": ["beginner", "greetings", "phrases"]
+    },
+    {
+      "path": "numbers.md",
+      "title": "Numbers 1-100",
+      "summary": "Cardinal numbers in Hungarian, basic counting and pronunciation tips.",
+      "tags": ["beginner", "numbers", "vocabulary"]
+    }
+  ]
+}

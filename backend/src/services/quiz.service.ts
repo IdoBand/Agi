@@ -15,8 +15,8 @@ const EvalResponseSchema = z.object({
   explanation: z.string(),
 });
 
-const QUESTIONS_PATH = path.resolve('src/scripts/tesseractjs/images2Questions.json');
-// const QUESTIONS_PATH = path.resolve('src/scripts/tesseractjs/orderedQuestions.json');
+const QUESTIONS_PATH = path.resolve('knowledge/citizenship/images2Questions.json');
+// const QUESTIONS_PATH = path.resolve('knowledge/citizenship/orderedQuestions.json');
 const AUDIO_DIR = path.resolve('assets/questionsAudio');
 
 let questionsCache: Question[] | null = null;
@@ -61,6 +61,11 @@ async function loadQuestionAudio(question: Question, index: number): Promise<Qui
     lipsync,
     facialExpression: 'default',
   };
+}
+
+export async function getRandomQuestionMeta(count: number): Promise<Question[]> {
+  const questions = await loadQuestions();
+  return shuffle(questions).slice(0, count);
 }
 
 export async function getRandomQuestions(count: number): Promise<QuizQuestion[]> {
