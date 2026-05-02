@@ -46,6 +46,11 @@ export const config = {
     model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6',
   },
 
+  googleTranslate: {
+    apiKey: process.env.GOOGLE_TRANSLATE_API_KEY || '',
+    endpoint: 'https://translation.googleapis.com/language/translate/v2',
+  },
+
   tutor: {
     knowledgeDir: path.resolve(process.env.TUTOR_KNOWLEDGE_DIR || './knowledge'),
   },

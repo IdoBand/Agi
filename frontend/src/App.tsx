@@ -51,7 +51,7 @@ export default function App() {
   return (
     <div className="w-full h-screen flex bg-black">
       <aside
-        className="w-1/4 h-full border-r border-gray-700 flex flex-col gap-4 p-4 overflow-y-auto z-20"
+        className="w-1/4 h-full border-r border-gray-700 flex flex-col gap-4 p-4 overflow-hidden min-h-0 z-20"
         style={{
           background:
             'linear-gradient(to bottom, #02152b 0%, #062a4a 25%, #1f4f7a 55%, #5f7fa0 75%, #c3b0b6 100%)',
