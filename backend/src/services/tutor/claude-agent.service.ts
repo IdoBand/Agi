@@ -43,7 +43,39 @@ function extractToolResultText(content: unknown): string {
   return JSON.stringify(content);
 }
 
-const FALLBACK = 'Bocsánat, nem hallottam jól. Mondanád újra?';
+const FALLBACK: BilingualReply = {
+  hu: 'Bocsánat, nem hallottam jól. Mondanád újra?',
+  en: "Sorry, I didn't catch that. Could you say it again?",
+};
+
+interface BilingualReply {
+  hu: string;
+  en: string;
+}
+
+function parseBilingualReply(raw: string): BilingualReply {
+  let s = raw.trim();
+  if (s.startsWith('```')) {
+    s = s.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
+  }
+  try {
+    const parsed: unknown = JSON.parse(s);
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      typeof (parsed as { hu?: unknown }).hu === 'string' &&
+      typeof (parsed as { en?: unknown }).en === 'string'
+    ) {
+      const hu = (parsed as { hu: string }).hu.trim();
+      const en = (parsed as { en: string }).en.trim();
+      if (hu) return { hu, en };
+    }
+    logger.warn(`[tutor-agent] bilingual parse: invalid shape`);
+  } catch (e) {
+    logger.warn(`[tutor-agent] bilingual parse failed: ${e}`);
+  }
+  return { hu: raw.trim(), en: '' };
+}
 
 function ensureInit(): void {
   if (!config.anthropic.apiKey) {
@@ -59,7 +91,7 @@ function buildPrompt(history: SessionState['history'], userText: string): string
   return `${transcript}\nLearner: ${userText}`;
 }
 
-export async function runTurn(sessionId: string, userText: string): Promise<string> {
+export async function runTurn(sessionId: string, userText: string): Promise<BilingualReply> {
   ensureInit();
   sweep();
 
@@ -126,23 +158,25 @@ export async function runTurn(sessionId: string, userText: string): Promise<stri
     throw e;
   }
 
-  const reply = assistantText.trim() || FALLBACK;
+  const trimmedRaw = assistantText.trim();
+  const { hu, en } = trimmedRaw ? parseBilingualReply(trimmedRaw) : FALLBACK;
 
   state.history.push({ role: 'user', text: userText });
-  state.history.push({ role: 'assistant', text: reply });
+  state.history.push({ role: 'assistant', text: hu });
   state.lastTouched = Date.now();
   sessions.set(sessionId, state);
 
   const trace: TurnTrace = {
     userText,
-    replyText: reply,
+    replyText: hu,
+    replyEn: en,
     toolCalls,
     startedAt,
     durationMs: Date.now() - startedAt,
   };
   void appendTurnTrace(sessionId, trace);
 
-  return reply;
+  return { hu, en };
 }
 
 export function getLastAssistantReply(sessionId: string): string | undefined {

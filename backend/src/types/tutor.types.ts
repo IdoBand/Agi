@@ -13,6 +13,7 @@ export interface KnowledgeManifest {
 
 export interface TutorTurnResponse {
   content: string;
+  contentEn: string;
   audio: string;
   lipsync: LipsyncData;
   facialExpression: FacialExpression;
@@ -36,6 +37,7 @@ export interface ToolCallTrace {
 export interface TurnTrace {
   userText: string;
   replyText: string;
+  replyEn?: string;
   toolCalls: ToolCallTrace[];
   startedAt: number;
   durationMs: number;

@@ -12,6 +12,7 @@ interface Props {
 
 export function TutorControlPanel({ phase, sessionId, transcript, micSelected, onStart, onReset }: Props) {
   const [showHistory, setShowHistory] = useState(false);
+  const [englishIdxs, setEnglishIdxs] = useState<Set<number>>(new Set());
   const transcriptRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -19,6 +20,21 @@ export function TutorControlPanel({ phase, sessionId, transcript, micSelected, o
       transcriptRef.current.scrollTop = transcriptRef.current.scrollHeight;
     }
   }, [transcript, showHistory]);
+
+  useEffect(() => {
+    if (transcript.length === 0 && englishIdxs.size > 0) {
+      setEnglishIdxs(new Set());
+    }
+  }, [transcript.length, englishIdxs.size]);
+
+  const toggleLang = (i: number) => {
+    setEnglishIdxs((prev) => {
+      const next = new Set(prev);
+      if (next.has(i)) next.delete(i);
+      else next.add(i);
+      return next;
+    });
+  };
 
   if (!sessionId) {
     return (
@@ -54,17 +70,30 @@ export function TutorControlPanel({ phase, sessionId, transcript, micSelected, o
       {showHistory && (
         <div ref={transcriptRef} className="flex-1 min-h-0 overflow-y-auto bg-black/30 rounded p-2 text-sm flex flex-col gap-2">
           {transcript.length === 0 && <div className="text-gray-400 italic">No turns yet.</div>}
-          {transcript.map((m, i) => (
-            <div
-              key={i}
-              className={`px-2 py-1 rounded ${
-                m.role === 'user' ? 'bg-blue-700/40 text-blue-100' : 'bg-white/15 text-gray-100'
-              }`}
-            >
-              <span className="font-bold mr-1">{m.role === 'user' ? 'You:' : 'Tutor:'}</span>
-              {m.text}
-            </div>
-          ))}
+          {transcript.map((m, i) => {
+            const hasEn = m.role === 'assistant' && !!m.textEn;
+            const showEn = hasEn && englishIdxs.has(i);
+            const body = showEn ? m.textEn! : m.text;
+            return (
+              <div
+                key={i}
+                className={`px-2 py-1 rounded ${
+                  m.role === 'user' ? 'bg-blue-700/40 text-blue-100' : 'bg-white/15 text-gray-100'
+                }`}
+              >
+                <span className="font-bold mr-1">{m.role === 'user' ? 'You:' : 'Tutor:'}</span>
+                {hasEn && (
+                  <button
+                    onClick={() => toggleLang(i)}
+                    className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 ml-1 mr-1 align-middle"
+                  >
+                    {showEn ? 'HU' : 'EN'}
+                  </button>
+                )}
+                {body}
+              </div>
+            );
+          })}
         </div>
       )}
 

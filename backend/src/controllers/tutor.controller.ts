@@ -40,16 +40,18 @@ export async function handleTutorTurn(
       return;
     }
 
-    const reply = await runTurn(sessionId, trimmed);
-    logger.info(`[tutor] sid=${sessionId} reply="${reply}"`);
+    const { hu, en } = await runTurn(sessionId, trimmed);
+    logger.info(`[tutor] sid=${sessionId} reply="${hu}"`);
+    logger.debug(`[tutor] sid=${sessionId} en.length=${en.length}`);
 
-    const audioBuf = await ttsService.synthesize(reply);
+    const audioBuf = await ttsService.synthesize(hu);
     const audioPath = await ttsService.saveToFile(audioBuf, ctx);
     const lipsync = await lipsyncService.generateLipsync(audioPath, ctx);
     const audioBytes = await fs.readFile(audioPath);
 
     const response: TutorTurnResponse = {
-      content: reply,
+      content: hu,
+      contentEn: en,
       audio: audioBytes.toString('base64'),
       lipsync,
       facialExpression: 'default',

@@ -4,6 +4,7 @@ export type TutorPhase = 'idle' | 'listening' | 'recording' | 'thinking' | 'spea
 
 export interface TutorTurnResponse {
   content: string;
+  contentEn: string;
   audio: string;
   lipsync: LipsyncData;
   facialExpression: FacialExpression;
@@ -13,5 +14,6 @@ export interface TutorTurnResponse {
 export interface TutorTranscriptEntry {
   role: 'user' | 'assistant';
   text: string;
+  textEn?: string;
   at: number;
 }

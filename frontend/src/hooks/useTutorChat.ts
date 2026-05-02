@@ -82,7 +82,7 @@ export function useTutorChat(recorder: VoiceRecorderInput, active: boolean): Use
         setTranscript((t) => [
           ...t,
           { role: 'user', text: data.userTranscript, at: Date.now() },
-          { role: 'assistant', text: data.content, at: Date.now() },
+          { role: 'assistant', text: data.content, textEn: data.contentEn, at: Date.now() },
         ]);
         setCurrentMessage({
           role: 'assistant',
