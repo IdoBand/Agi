@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Message } from '../types/message.types';
 import { TutorPhase, TutorTranscriptEntry, TurnEvent } from '../types/tutor.types';
+import { ensureAudioContextRunning } from '../utils/audioContext';
 
 interface VoiceRecorderInput {
   isRecording: boolean;
@@ -243,6 +244,9 @@ export function useTutorChat(
       if (phase !== 'listening') return;
       if (!selectedDeviceId || isRecording) return;
       e.preventDefault();
+      // Wake the WebAudio graph on this user gesture so the avatar's analyser
+      // can play through it without being silenced by autoplay policy.
+      ensureAudioContextRunning();
       setPhase('recording');
       startRecording();
     };

@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { AvatarProps } from '../types/avatar.types';
 import { MouthCue } from '../types/message.types';
 import { visemeMapping, allVisemes, lerp } from '../utils/lipsync';
+import { getAudioContext } from '../utils/audioContext';
 import {
   facialExpressions,
   allExpressionMorphTargets,
@@ -21,6 +22,11 @@ export function Avatar({
 }: AvatarProps) {
   const { scene } = useGLTF(modelUrl);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const amplitudeBufferRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
+  const mouthOpenRef = useRef<number>(0);
 
   // Create audio element and handle playback
   useEffect(() => {
@@ -33,18 +39,52 @@ export function Avatar({
     const audioElement = new Audio(audioData);
     audioRef.current = audioElement;
 
+    // Set up WebAudio analyser for amplitude-driven mouth animation. The
+    // AudioContext is a process-wide singleton resumed on the user gesture
+    // (T-key press) so audio is not silenced here by autoplay policy.
+    const audioContext = getAudioContext();
+    audioContextRef.current = audioContext;
+
+    let analyser = analyserRef.current;
+    if (!analyser) {
+      analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.6;
+      analyser.connect(audioContext.destination);
+      analyserRef.current = analyser;
+      amplitudeBufferRef.current = new Uint8Array(new ArrayBuffer(analyser.fftSize));
+    }
+
+    const sourceNode = audioContext.createMediaElementSource(audioElement);
+    sourceNode.connect(analyser);
+    sourceNodeRef.current = sourceNode;
+
     audioElement.onended = () => {
       onAudioEnd?.();
     };
 
-    audioElement.play().catch((err) => {
-      console.error('Audio playback error:', err);
-      onAudioEnd?.();
-    });
+    const startPlayback = async () => {
+      try {
+        if (audioContext.state === 'suspended') {
+          await audioContext.resume();
+        }
+        await audioElement.play();
+      } catch (err) {
+        console.error('Audio playback error:', err);
+        onAudioEnd?.();
+      }
+    };
+    startPlayback();
 
     return () => {
       audioElement.pause();
       audioElement.src = '';
+      try {
+        sourceNode.disconnect();
+      } catch {
+        // already disconnected
+      }
+      sourceNodeRef.current = null;
     };
   }, [audio, onAudioEnd]);
 
@@ -84,8 +124,15 @@ export function Avatar({
     const currentTime = audioElement?.currentTime || 0;
     const isAudioPlaying = audioElement && !audioElement.paused;
 
-    // Reset all visemes
+    // Amplitude-driven mouth (used when no lipsync cues are provided, e.g. streaming path)
+    const useAmplitudeMouth = isAudioPlaying && !lipsync && !!analyserRef.current;
+    const amplitudeVisemes = new Set<string>(['viseme_AA', 'viseme_O']);
+
+    // Reset all visemes (skip the two AA/O drive amplitude path manages itself)
     allVisemes.forEach((viseme) => {
+      if (useAmplitudeMouth && amplitudeVisemes.has(viseme)) {
+        return;
+      }
       lerpMorphTarget(viseme, 0, 0.5);
     });
 
@@ -94,6 +141,22 @@ export function Avatar({
       const viseme = getCurrentViseme(currentTime);
       const morphTarget = visemeMapping[viseme] || 'viseme_PP';
       lerpMorphTarget(morphTarget, 1, 0.5);
+    } else if (useAmplitudeMouth) {
+      const analyser = analyserRef.current!;
+      const buf = amplitudeBufferRef.current!;
+      analyser.getByteTimeDomainData(buf);
+      let sumSq = 0;
+      for (let i = 0; i < buf.length; i++) {
+        const v = (buf[i] - 128) / 128;
+        sumSq += v * v;
+      }
+      const rms = Math.sqrt(sumSq / buf.length);
+      const target = Math.min(1, rms * 4);
+      mouthOpenRef.current = lerp(mouthOpenRef.current, target, 0.35);
+      lerpMorphTarget('viseme_AA', mouthOpenRef.current, 0.5);
+      lerpMorphTarget('viseme_O', mouthOpenRef.current * 0.3, 0.5);
+    } else {
+      mouthOpenRef.current = lerp(mouthOpenRef.current, 0, 0.35);
     }
 
     // Apply facial expression
