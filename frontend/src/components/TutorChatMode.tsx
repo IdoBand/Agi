@@ -14,10 +14,11 @@ interface Props {
   recorder: VoiceRecorderInput;
   onMessage: (m: Message | null) => void;
   onAudioEndRef: (cb: () => void) => void;
+  onPttAvailableChange: (v: boolean) => void;
 }
 
-export function TutorChatMode({ recorder, onMessage, onAudioEndRef }: Props) {
-  const tutor = useTutorChat(recorder, true);
+export function TutorChatMode({ recorder, onMessage, onAudioEndRef, onPttAvailableChange }: Props) {
+  const tutor = useTutorChat(recorder, true, onPttAvailableChange);
 
   useEffect(() => {
     onMessage(tutor.currentMessage);

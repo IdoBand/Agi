@@ -32,7 +32,10 @@ interface UseQuizReturn {
   playRecordedAnswer: () => void;
 }
 
-export function useQuiz(recorder: VoiceRecorderInput): UseQuizReturn {
+export function useQuiz(
+  recorder: VoiceRecorderInput,
+  onPttAvailableChange?: (v: boolean) => void,
+): UseQuizReturn {
   const [phase, setPhase] = useState<QuizPhase>('idle');
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -123,6 +126,13 @@ export function useQuiz(recorder: VoiceRecorderInput): UseQuizReturn {
     stopPlaybackAudio();
     playAudioFromBlob(recordedBlob);
   }, [isAudioPlaying, recordedBlob, stopPlaybackAudio, playAudioFromBlob]);
+
+  useEffect(() => {
+    if (!onPttAvailableChange) return;
+    const available = (phase === 'listening' || phase === 'recorded') && !!selectedDeviceId && !isRecording;
+    onPttAvailableChange(available);
+    return () => onPttAvailableChange(false);
+  }, [phase, selectedDeviceId, isRecording, onPttAvailableChange]);
 
   // T key handling for quiz recording
   useEffect(() => {

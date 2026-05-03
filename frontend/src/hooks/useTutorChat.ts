@@ -25,7 +25,11 @@ function newSessionId(): string {
   return `sid-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-export function useTutorChat(recorder: VoiceRecorderInput, active: boolean): UseTutorChatReturn {
+export function useTutorChat(
+  recorder: VoiceRecorderInput,
+  active: boolean,
+  onPttAvailableChange?: (v: boolean) => void,
+): UseTutorChatReturn {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [phase, setPhase] = useState<TutorPhase>('idle');
   const [currentMessage, setCurrentMessage] = useState<Message | null>(null);
@@ -107,6 +111,13 @@ export function useTutorChat(recorder: VoiceRecorderInput, active: boolean): Use
     setCurrentMessage(null);
     setPhase('listening');
   }, []);
+
+  useEffect(() => {
+    if (!onPttAvailableChange) return;
+    const available = active && !!sessionId && phase === 'listening' && !!selectedDeviceId && !isRecording;
+    onPttAvailableChange(available);
+    return () => onPttAvailableChange(false);
+  }, [active, sessionId, phase, selectedDeviceId, isRecording, onPttAvailableChange]);
 
   // T-key push-to-talk
   useEffect(() => {

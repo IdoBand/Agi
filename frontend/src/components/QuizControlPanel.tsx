@@ -135,38 +135,25 @@ export function QuizControlPanel({
 
         {phase === 'listening' && (
           <div className="flex flex-col items-center gap-2">
-            {isRecording ? (
-              <div className="flex items-center gap-3 text-red-400">
-                <div className="w-3 h-3 bg-red-400 rounded-full animate-pulse" />
-                <span className="font-medium">Recording... Release T to stop</span>
-              </div>
-            ) : (
-              <>
-                <span className="text-gray-300 font-medium">Hold T to record your answer</span>
-                <button
-                  onClick={onReplayQuestion}
-                  disabled={isAudioPlaying}
-                  className={`text-sm px-4 py-1.5 rounded-full transition-colors ${
-                    isAudioPlaying
-                      ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                      : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-                  }`}
-                >
-                  Replay Question
-                </button>
-              </>
+            {!isRecording && (
+              <button
+                onClick={onReplayQuestion}
+                disabled={isAudioPlaying}
+                className={`text-sm px-4 py-1.5 rounded-full transition-colors ${
+                  isAudioPlaying
+                    ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                    : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                }`}
+              >
+                Replay Question
+              </button>
             )}
           </div>
         )}
 
         {phase === 'recorded' && (
           <div className="flex flex-col items-center gap-2">
-            {isRecording ? (
-              <div className="flex items-center gap-3 text-red-400">
-                <div className="w-3 h-3 bg-red-400 rounded-full animate-pulse" />
-                <span className="font-medium">Re-recording... Release T to stop</span>
-              </div>
-            ) : (
+            {!isRecording && (
               <>
                 <button
                   onClick={onSendAnswer}

@@ -98,15 +98,6 @@ export function TutorControlPanel({ phase, sessionId, transcript, micSelected, o
       )}
 
       <div className="animate-fadeIn">
-        {phase === 'listening' && (
-          <div className="text-center text-gray-200 font-medium">Hold T to talk</div>
-        )}
-        {phase === 'recording' && (
-          <div className="flex items-center justify-center gap-3 text-red-400">
-            <div className="w-3 h-3 bg-red-400 rounded-full animate-pulse" />
-            <span className="font-medium">Recording... release T</span>
-          </div>
-        )}
         {phase === 'thinking' && (
           <div className="flex items-center justify-center gap-3 text-white">
             <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />

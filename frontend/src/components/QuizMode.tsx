@@ -15,10 +15,11 @@ interface Props {
   recorder: VoiceRecorderInput;
   onMessage: (m: Message | null) => void;
   onAudioEndRef: (cb: () => void) => void;
+  onPttAvailableChange: (v: boolean) => void;
 }
 
-export function QuizMode({ recorder, onMessage, onAudioEndRef }: Props) {
-  const quiz = useQuiz(recorder);
+export function QuizMode({ recorder, onMessage, onAudioEndRef, onPttAvailableChange }: Props) {
+  const quiz = useQuiz(recorder, onPttAvailableChange);
 
   useEffect(() => {
     onMessage(quiz.currentMessage);

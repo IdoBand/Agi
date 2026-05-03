@@ -1,6 +1,7 @@
 import { Canvas } from '@react-three/fiber';
 import { Suspense, useCallback, useRef, useState } from 'react';
 import { Experience } from './components/Experience';
+import { MediaConsole } from './components/MediaConsole';
 import { QuizMode } from './components/QuizMode';
 import { TutorChatMode } from './components/TutorChatMode';
 import { useVoiceRecorder } from './hooks/useVoiceRecorder';
@@ -38,6 +39,7 @@ export default function App() {
   const [isModelLoaded, setIsModelLoaded] = useState(false);
   const [mode, setMode] = useState<Mode>('quiz');
   const [currentMessage, setCurrentMessage] = useState<Message | null>(null);
+  const [pttAvailable, setPttAvailable] = useState(false);
   const audioEndCbRef = useRef<() => void>(() => {});
 
   const recorder = useVoiceRecorder();
@@ -76,24 +78,21 @@ export default function App() {
           </button>
         </div>
 
-        <select
-          value={recorder.selectedDeviceId || ''}
-          onChange={(e) => recorder.setSelectedDeviceId(e.target.value)}
-          className="w-full bg-gray-800 text-white px-3 py-2 rounded-lg border border-gray-600 focus:outline-none focus:border-blue-500"
-        >
-          <option value="" disabled>Select microphone</option>
-          {recorder.devices.map((d) => (
-            <option key={d.deviceId} value={d.deviceId}>
-              {d.label || `Microphone ${d.deviceId.slice(0, 8)}`}
-            </option>
-          ))}
-        </select>
-
         {mode === 'quiz' && (
-          <QuizMode recorder={recorder} onMessage={handleMessage} onAudioEndRef={registerAudioEndCb} />
+          <QuizMode
+            recorder={recorder}
+            onMessage={handleMessage}
+            onAudioEndRef={registerAudioEndCb}
+            onPttAvailableChange={setPttAvailable}
+          />
         )}
         {mode === 'tutor' && (
-          <TutorChatMode recorder={recorder} onMessage={handleMessage} onAudioEndRef={registerAudioEndCb} />
+          <TutorChatMode
+            recorder={recorder}
+            onMessage={handleMessage}
+            onAudioEndRef={registerAudioEndCb}
+            onPttAvailableChange={setPttAvailable}
+          />
         )}
       </aside>
 
@@ -121,6 +120,8 @@ export default function App() {
             />
           </Suspense>
         </Canvas>
+
+        <MediaConsole recorder={recorder} pttAvailable={pttAvailable} />
 
         {!isModelLoaded && <LoadingOverlay />}
       </div>
