@@ -1,7 +1,6 @@
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import { config } from '../../config/index.js';
 import { logger } from '../../utils/logger.js';
-import { TUTOR_SYSTEM_PROMPT } from './system-prompt.js';
 import { CITIZENSHIP_INTERVIEW_PROMPT } from './system-prompt.js';
 import { buildTutorMcpServer, TUTOR_TOOL_NAMES, dropEvalLog } from './tutor-tools.js';
 import { ToolCallTrace, TurnTrace } from '../../types/tutor.types.js';
@@ -14,6 +13,8 @@ interface SessionState {
 
 const sessions = new Map<string, SessionState>();
 const SESSION_TTL_MS = 60 * 60 * 1000;
+
+const FALLBACK_HU = 'Bocsánat, nem hallottam jól. Mondanád újra?';
 
 function sweep(): void {
   const now = Date.now();
@@ -43,46 +44,6 @@ function extractToolResultText(content: unknown): string {
   return JSON.stringify(content);
 }
 
-const FALLBACK: BilingualReply = {
-  hu: 'Bocsánat, nem hallottam jól. Mondanád újra?',
-  en: "Sorry, I didn't catch that. Could you say it again?",
-};
-
-interface BilingualReply {
-  hu: string;
-  en: string;
-}
-
-function parseBilingualReply(raw: string): BilingualReply {
-  const huMatch = raw.match(/<hu>([\s\S]*?)<\/hu>/i);
-  const enMatch = raw.match(/<en>([\s\S]*?)<\/en>/i);
-  if (huMatch) {
-    const hu = huMatch[1].trim();
-    const en = enMatch ? enMatch[1].trim() : '';
-    if (hu) return { hu, en };
-  }
-  let s = raw.trim();
-  if (s.startsWith('```')) {
-    s = s.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
-  }
-  try {
-    const parsed: unknown = JSON.parse(s);
-    if (
-      parsed &&
-      typeof parsed === 'object' &&
-      typeof (parsed as { hu?: unknown }).hu === 'string' &&
-      typeof (parsed as { en?: unknown }).en === 'string'
-    ) {
-      const hu = (parsed as { hu: string }).hu.trim();
-      const en = (parsed as { en: string }).en.trim();
-      if (hu) return { hu, en };
-    }
-  } catch { /* fall through */ }
-  logger.warn(`[tutor-agent] bilingual parse failed; raw len=${raw.length}`);
-  const stripped = raw.replace(/<\/?(hu|en)>/gi, '').trim();
-  return { hu: stripped, en: '' };
-}
-
 function ensureInit(): void {
   if (!config.anthropic.apiKey) {
     throw new Error('ANTHROPIC_API_KEY is not set; tutor mode unavailable.');
@@ -97,7 +58,34 @@ function buildPrompt(history: SessionState['history'], userText: string): string
   return `${transcript}\nLearner: ${userText}`;
 }
 
-export async function runTurn(sessionId: string, userText: string): Promise<BilingualReply> {
+const SENTENCE_BOUNDARY = /([^.!?…\n]+[.!?…]+|\S[^\n]*\n)/g;
+
+function extractSentences(buffer: string): { sentences: string[]; remainder: string } {
+  const sentences: string[] = [];
+  let lastIdx = 0;
+  SENTENCE_BOUNDARY.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = SENTENCE_BOUNDARY.exec(buffer)) !== null) {
+    const s = m[0].trim();
+    if (s.length >= 2) sentences.push(s);
+    lastIdx = SENTENCE_BOUNDARY.lastIndex;
+  }
+  return { sentences, remainder: buffer.slice(lastIdx) };
+}
+
+export interface SentenceEvent {
+  idx: number;
+  hu: string;
+}
+
+export interface RunTurnStreamResult {
+  fullHu: string;
+}
+
+export async function* runTurnStream(
+  sessionId: string,
+  userText: string,
+): AsyncGenerator<SentenceEvent, RunTurnStreamResult, void> {
   ensureInit();
   sweep();
 
@@ -107,9 +95,22 @@ export async function runTurn(sessionId: string, userText: string): Promise<Bili
   const prompt = buildPrompt(state.history, userText);
 
   let assistantText = '';
+  let buffer = '';
+  let idx = 0;
   const startedAt = Date.now();
   const toolCalls: ToolCallTrace[] = [];
   const toolById = new Map<string, ToolCallTrace>();
+
+  const pending: SentenceEvent[] = [];
+
+  const flushFromBuffer = (): void => {
+    const { sentences, remainder } = extractSentences(buffer);
+    buffer = remainder;
+    for (const s of sentences) {
+      pending.push({ idx: idx++, hu: s });
+    }
+  };
+
   try {
     const q = query({
       prompt,
@@ -130,8 +131,11 @@ export async function runTurn(sessionId: string, userText: string): Promise<Bili
     for await (const msg of q) {
       if (msg.type === 'assistant') {
         for (const block of msg.message.content) {
-          if (block.type === 'text') assistantText += block.text;
-          else if (block.type === 'tool_use') {
+          if (block.type === 'text') {
+            assistantText += block.text;
+            buffer += block.text;
+            flushFromBuffer();
+          } else if (block.type === 'tool_use') {
             const tc: ToolCallTrace = { name: block.name, input: block.input };
             toolCalls.push(tc);
             toolById.set(block.id, tc);
@@ -152,11 +156,13 @@ export async function runTurn(sessionId: string, userText: string): Promise<Bili
           }
         }
       } else if (msg.type === 'result') {
-        if (msg.subtype === 'success' && msg.result) {
-          assistantText = msg.result;
-        } else if (msg.subtype !== 'success') {
+        if (msg.subtype !== 'success') {
           logger.warn(`[tutor-agent] non-success result: ${msg.subtype}`);
         }
+      }
+
+      while (pending.length > 0) {
+        yield pending.shift()!;
       }
     }
   } catch (e) {
@@ -164,25 +170,34 @@ export async function runTurn(sessionId: string, userText: string): Promise<Bili
     throw e;
   }
 
-  const trimmedRaw = assistantText.trim();
-  const { hu, en } = trimmedRaw ? parseBilingualReply(trimmedRaw) : FALLBACK;
+  const tail = buffer.trim();
+  if (tail.length >= 2) {
+    yield { idx: idx++, hu: tail };
+  }
+
+  let fullHu = assistantText.trim();
+  if (!fullHu) {
+    fullHu = FALLBACK_HU;
+    if (idx === 0) {
+      yield { idx: idx++, hu: FALLBACK_HU };
+    }
+  }
 
   state.history.push({ role: 'user', text: userText });
-  state.history.push({ role: 'assistant', text: hu });
+  state.history.push({ role: 'assistant', text: fullHu });
   state.lastTouched = Date.now();
   sessions.set(sessionId, state);
 
   const trace: TurnTrace = {
     userText,
-    replyText: hu,
-    replyEn: en,
+    replyText: fullHu,
     toolCalls,
     startedAt,
     durationMs: Date.now() - startedAt,
   };
   void appendTurnTrace(sessionId, trace);
 
-  return { hu, en };
+  return { fullHu };
 }
 
 export function getLastAssistantReply(sessionId: string): string | undefined {

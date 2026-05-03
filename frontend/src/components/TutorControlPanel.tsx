@@ -10,9 +10,15 @@ interface Props {
   onReset: () => void;
 }
 
+interface TranslateResponse {
+  translatedText: string;
+}
+
 export function TutorControlPanel({ phase, sessionId, transcript, micSelected, onStart, onReset }: Props) {
   const [showHistory, setShowHistory] = useState(false);
   const [englishIdxs, setEnglishIdxs] = useState<Set<number>>(new Set());
+  const [translations, setTranslations] = useState<Record<number, string>>({});
+  const [loadingIdxs, setLoadingIdxs] = useState<Set<number>>(new Set());
   const transcriptRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -22,18 +28,49 @@ export function TutorControlPanel({ phase, sessionId, transcript, micSelected, o
   }, [transcript, showHistory]);
 
   useEffect(() => {
-    if (transcript.length === 0 && englishIdxs.size > 0) {
-      setEnglishIdxs(new Set());
+    if (transcript.length === 0) {
+      if (englishIdxs.size > 0) setEnglishIdxs(new Set());
+      if (Object.keys(translations).length > 0) setTranslations({});
     }
-  }, [transcript.length, englishIdxs.size]);
+  }, [transcript.length, englishIdxs.size, translations]);
 
-  const toggleLang = (i: number) => {
+  const fetchTranslation = async (i: number, text: string): Promise<void> => {
+    setLoadingIdxs((prev) => {
+      const next = new Set(prev);
+      next.add(i);
+      return next;
+    });
+    try {
+      const res = await fetch('/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, targetLang: 'en', sourceLang: 'hu' }),
+      });
+      if (!res.ok) throw new Error(`translate failed: ${res.status}`);
+      const data = (await res.json()) as TranslateResponse;
+      setTranslations((prev) => ({ ...prev, [i]: data.translatedText }));
+    } catch (err) {
+      console.error('[tutor] translate error', err);
+    } finally {
+      setLoadingIdxs((prev) => {
+        const next = new Set(prev);
+        next.delete(i);
+        return next;
+      });
+    }
+  };
+
+  const toggleLang = (i: number, text: string) => {
+    const willShowEn = !englishIdxs.has(i);
     setEnglishIdxs((prev) => {
       const next = new Set(prev);
       if (next.has(i)) next.delete(i);
       else next.add(i);
       return next;
     });
+    if (willShowEn && !translations[i] && !loadingIdxs.has(i)) {
+      void fetchTranslation(i, text);
+    }
   };
 
   if (!sessionId) {
@@ -71,9 +108,11 @@ export function TutorControlPanel({ phase, sessionId, transcript, micSelected, o
         <div ref={transcriptRef} className="flex-1 min-h-0 overflow-y-auto bg-black/30 rounded p-2 text-sm flex flex-col gap-2">
           {transcript.length === 0 && <div className="text-gray-400 italic">No turns yet.</div>}
           {transcript.map((m, i) => {
-            const hasEn = m.role === 'assistant' && !!m.textEn;
-            const showEn = hasEn && englishIdxs.has(i);
-            const body = showEn ? m.textEn! : m.text;
+            const isAssistant = m.role === 'assistant';
+            const showEn = isAssistant && englishIdxs.has(i);
+            const loading = loadingIdxs.has(i);
+            const en = translations[i] ?? m.textEn;
+            const body = showEn ? (en ?? '') : m.text;
             return (
               <div
                 key={i}
@@ -82,15 +121,23 @@ export function TutorControlPanel({ phase, sessionId, transcript, micSelected, o
                 }`}
               >
                 <span className="font-bold mr-1">{m.role === 'user' ? 'You:' : 'Tutor:'}</span>
-                {hasEn && (
+                {isAssistant && m.text && (
                   <button
-                    onClick={() => toggleLang(i)}
+                    onClick={() => toggleLang(i, m.text)}
                     className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 ml-1 mr-1 align-middle"
+                    disabled={loading}
                   >
                     {showEn ? 'HU' : 'EN'}
                   </button>
                 )}
-                {body}
+                {showEn && loading && !en ? (
+                  <span className="inline-flex items-center gap-1 align-middle">
+                    <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
+                    <span className="italic text-gray-400">translating...</span>
+                  </span>
+                ) : (
+                  body
+                )}
               </div>
             );
           })}

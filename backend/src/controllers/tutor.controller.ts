@@ -1,14 +1,16 @@
 import { Request, Response, NextFunction } from 'express';
-import fs from 'fs/promises';
 import { ChatRequest } from '../types/request.types.js';
-import { TutorTurnResponse } from '../types/tutor.types.js';
+import { TurnEvent } from '../types/tutor.types.js';
 import { WorkflowContext, deleteWorkflowDir } from '../utils/file.utils.js';
 import { sttService } from '../services/stt/stt.service.js';
 import { ttsService } from '../services/tts/tts.service.js';
-import { lipsyncService } from '../services/lipsync/lipsync.service.js';
-import { runTurn, resetSession, getLastAssistantReply } from '../services/tutor/claude-agent.service.js';
+import { runTurnStream, resetSession, getLastAssistantReply } from '../services/tutor/claude-agent.service.js';
 import { buildSttPrompt } from '../services/tutor/stt-prompt.js';
 import { logger } from '../utils/logger.js';
+
+function sseSend(res: Response, event: TurnEvent): void {
+  res.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
+}
 
 export async function handleTutorTurn(
   req: ChatRequest,
@@ -31,7 +33,8 @@ export async function handleTutorTurn(
   try {
     const sttPrompt = buildSttPrompt(getLastAssistantReply(sessionId));
     const userTranscript = await sttService.transcribe(audioFile.path, ctx, sttPrompt);
-    logger.info(`[tutor] sid=${sessionId} stt="${userTranscript}"`);
+    const sttDoneAt = Date.now();
+    logger.info(`[tutor] sid=${sessionId} stt_done text="${userTranscript}"`);
 
     const trimmed = userTranscript.trim();
     if (!trimmed) {
@@ -40,28 +43,89 @@ export async function handleTutorTurn(
       return;
     }
 
-    const { hu, en } = await runTurn(sessionId, trimmed);
-    logger.info(`[tutor] sid=${sessionId} reply="${hu}"`);
-    logger.debug(`[tutor] sid=${sessionId} en.length=${en.length}`);
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
 
-    const audioBuf = await ttsService.synthesize(hu);
-    const audioPath = await ttsService.saveToFile(audioBuf, ctx);
-    const lipsync = await lipsyncService.generateLipsync(audioPath, ctx);
-    const audioBytes = await fs.readFile(audioPath);
+    sseSend(res, { type: 'transcript', text: trimmed });
 
-    const response: TutorTurnResponse = {
-      content: hu,
-      contentEn: en,
-      audio: audioBytes.toString('base64'),
-      lipsync,
-      facialExpression: 'default',
-      userTranscript: trimmed,
+    let firstSentenceAt: number | null = null;
+    let firstAudioAt: number | null = null;
+
+    const ttsPromises: Array<Promise<{ idx: number; base64: string }>> = [];
+    let nextEmitIdx = 0;
+    const ready = new Map<number, string>();
+
+    const drainAudio = (): void => {
+      while (ready.has(nextEmitIdx)) {
+        const base64 = ready.get(nextEmitIdx)!;
+        ready.delete(nextEmitIdx);
+        if (firstAudioAt === null) {
+          firstAudioAt = Date.now();
+          logger.info(
+            `[tutor] sid=${sessionId} first_audio_emitted dt_from_stt=${firstAudioAt - sttDoneAt}ms`
+          );
+        }
+        sseSend(res, { type: 'audio', idx: nextEmitIdx, base64 });
+        nextEmitIdx++;
+      }
     };
-    res.json(response);
+
+    const stream = runTurnStream(sessionId, trimmed);
+    let result: { fullHu: string } = { fullHu: '' };
+    while (true) {
+      const next = await stream.next();
+      if (next.done) {
+        result = next.value;
+        break;
+      }
+      const { idx, hu } = next.value;
+      if (firstSentenceAt === null) {
+        firstSentenceAt = Date.now();
+        logger.info(
+          `[tutor] sid=${sessionId} first_sentence_emitted dt_from_stt=${firstSentenceAt - sttDoneAt}ms`
+        );
+      }
+      sseSend(res, { type: 'sentence', idx, hu });
+
+      const p = ttsService
+        .synthesize(hu)
+        .then((buf) => ({ idx, base64: buf.toString('base64') }))
+        .then((r) => {
+          ready.set(r.idx, r.base64);
+          drainAudio();
+          return r;
+        })
+        .catch((err) => {
+          logger.error(`[tutor] sid=${sessionId} tts error idx=${idx}: ${err}`);
+          ready.set(idx, '');
+          drainAudio();
+          return { idx, base64: '' };
+        });
+      ttsPromises.push(p);
+    }
+
+    await Promise.all(ttsPromises);
+    drainAudio();
+
+    sseSend(res, { type: 'done', fullHu: result.fullHu });
+    logger.info(
+      `[tutor] sid=${sessionId} done total_dt_from_stt=${Date.now() - sttDoneAt}ms reply="${result.fullHu}"`
+    );
+    res.end();
     await deleteWorkflowDir(ctx);
   } catch (error) {
     logger.error(`[tutor-turn] error: ${error}`);
-    next(error);
+    if (!res.headersSent) {
+      next(error);
+    } else {
+      try {
+        res.end();
+      } catch {
+        // ignore
+      }
+    }
   }
 }
 

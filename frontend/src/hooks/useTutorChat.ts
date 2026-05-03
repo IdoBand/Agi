@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Message } from '../types/message.types';
-import { TutorPhase, TutorTranscriptEntry, TutorTurnResponse } from '../types/tutor.types';
+import { TutorPhase, TutorTranscriptEntry, TurnEvent } from '../types/tutor.types';
 
 interface VoiceRecorderInput {
   isRecording: boolean;
@@ -25,6 +25,30 @@ function newSessionId(): string {
   return `sid-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+interface SSEMessage {
+  event: string;
+  data: string;
+}
+
+function parseSseChunk(buffer: string): { messages: SSEMessage[]; remainder: string } {
+  const messages: SSEMessage[] = [];
+  let idx = 0;
+  while (true) {
+    const sep = buffer.indexOf('\n\n', idx);
+    if (sep === -1) break;
+    const raw = buffer.slice(idx, sep);
+    idx = sep + 2;
+    let event = 'message';
+    const dataLines: string[] = [];
+    for (const line of raw.split('\n')) {
+      if (line.startsWith('event:')) event = line.slice(6).trim();
+      else if (line.startsWith('data:')) dataLines.push(line.slice(5).trim());
+    }
+    messages.push({ event, data: dataLines.join('\n') });
+  }
+  return { messages, remainder: buffer.slice(idx) };
+}
+
 export function useTutorChat(
   recorder: VoiceRecorderInput,
   active: boolean,
@@ -35,6 +59,9 @@ export function useTutorChat(
   const [currentMessage, setCurrentMessage] = useState<Message | null>(null);
   const [transcript, setTranscript] = useState<TutorTranscriptEntry[]>([]);
   const inFlightRef = useRef<AbortController | null>(null);
+  const audioQueueRef = useRef<string[]>([]);
+  const playingRef = useRef<boolean>(false);
+  const turnDoneRef = useRef<boolean>(false);
 
   const { isRecording, selectedDeviceId, startRecording, stopRecording } = recorder;
 
@@ -61,18 +88,58 @@ export function useTutorChat(
         // ignore
       }
     }
+    audioQueueRef.current = [];
+    playingRef.current = false;
+    turnDoneRef.current = false;
     setSessionId(null);
     setTranscript([]);
     setCurrentMessage(null);
     setPhase('idle');
   }, [sessionId]);
 
+  const playNext = useCallback(() => {
+    const next = audioQueueRef.current.shift();
+    if (!next) {
+      playingRef.current = false;
+      if (turnDoneRef.current) {
+        setCurrentMessage(null);
+        setPhase('listening');
+      }
+      return;
+    }
+    playingRef.current = true;
+    setCurrentMessage({ role: 'assistant', content: '', audio: next });
+  }, []);
+
+  const enqueueAudio = useCallback(
+    (base64: string) => {
+      if (!base64) return;
+      audioQueueRef.current.push(base64);
+      if (!playingRef.current) {
+        setPhase('speaking');
+        playNext();
+      }
+    },
+    [playNext]
+  );
+
+  const onAssistantAudioEnd = useCallback(() => {
+    playNext();
+  }, [playNext]);
+
   const sendTurn = useCallback(
     async (blob: Blob, sid: string) => {
       if (inFlightRef.current) inFlightRef.current.abort();
       const controller = new AbortController();
       inFlightRef.current = controller;
+      audioQueueRef.current = [];
+      playingRef.current = false;
+      turnDoneRef.current = false;
       setPhase('thinking');
+
+      const turnAt = Date.now();
+      let userText = '';
+      let assistantText = '';
 
       try {
         const fd = new FormData();
@@ -80,37 +147,84 @@ export function useTutorChat(
         fd.append('sessionId', sid);
         const res = await fetch('/tutor/turn', { method: 'POST', body: fd, signal: controller.signal });
         if (!res.ok) throw new Error(`tutor turn failed: ${res.status}`);
-        const data: TutorTurnResponse = await res.json();
-        if (controller.signal.aborted) return;
+        if (!res.body) throw new Error('no response body');
 
-        setTranscript((t) => [
-          ...t,
-          { role: 'user', text: data.userTranscript, at: Date.now() },
-          { role: 'assistant', text: data.content, textEn: data.contentEn, at: Date.now() },
-        ]);
-        setCurrentMessage({
-          role: 'assistant',
-          content: data.content,
-          audio: data.audio,
-          lipsync: data.lipsync,
-          facialExpression: data.facialExpression,
-        });
-        setPhase('speaking');
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          if (controller.signal.aborted) return;
+          buffer += decoder.decode(value, { stream: true });
+          const { messages, remainder } = parseSseChunk(buffer);
+          buffer = remainder;
+          for (const msg of messages) {
+            let payload: TurnEvent;
+            try {
+              payload = JSON.parse(msg.data) as TurnEvent;
+            } catch {
+              continue;
+            }
+            if (payload.type === 'transcript') {
+              userText = payload.text;
+              setTranscript((t) => [...t, { role: 'user', text: payload.text, at: turnAt }]);
+              setTranscript((t) => [...t, { role: 'assistant', text: '', at: Date.now() }]);
+            } else if (payload.type === 'sentence') {
+              const sep = assistantText.length === 0 ? '' : ' ';
+              assistantText += sep + payload.hu;
+              const accumulated = assistantText;
+              setTranscript((t) => {
+                const next = [...t];
+                for (let i = next.length - 1; i >= 0; i--) {
+                  if (next[i].role === 'assistant') {
+                    next[i] = { ...next[i], text: accumulated };
+                    break;
+                  }
+                }
+                return next;
+              });
+            } else if (payload.type === 'audio') {
+              enqueueAudio(payload.base64);
+            } else if (payload.type === 'done') {
+              turnDoneRef.current = true;
+              if (payload.fullHu && payload.fullHu !== assistantText) {
+                const finalText = payload.fullHu;
+                setTranscript((t) => {
+                  const next = [...t];
+                  for (let i = next.length - 1; i >= 0; i--) {
+                    if (next[i].role === 'assistant') {
+                      next[i] = { ...next[i], text: finalText };
+                      break;
+                    }
+                  }
+                  return next;
+                });
+              }
+            }
+          }
+        }
+
+        if (!playingRef.current && audioQueueRef.current.length === 0) {
+          setCurrentMessage(null);
+          setPhase('listening');
+        }
       } catch (err) {
         if (controller.signal.aborted) return;
         console.error('[tutor] turn error', err);
+        audioQueueRef.current = [];
+        playingRef.current = false;
+        setCurrentMessage(null);
         setPhase('listening');
       } finally {
         if (inFlightRef.current === controller) inFlightRef.current = null;
+        void userText;
+        void assistantText;
       }
     },
-    []
+    [enqueueAudio]
   );
-
-  const onAssistantAudioEnd = useCallback(() => {
-    setCurrentMessage(null);
-    setPhase('listening');
-  }, []);
 
   useEffect(() => {
     if (!onPttAvailableChange) return;

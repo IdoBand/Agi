@@ -1,5 +1,3 @@
-import { LipsyncData, FacialExpression } from './message.types.js';
-
 export interface KnowledgeEntry {
   path: string;
   title: string;
@@ -11,14 +9,11 @@ export interface KnowledgeManifest {
   entries: KnowledgeEntry[];
 }
 
-export interface TutorTurnResponse {
-  content: string;
-  contentEn: string;
-  audio: string;
-  lipsync: LipsyncData;
-  facialExpression: FacialExpression;
-  userTranscript: string;
-}
+export type TurnEvent =
+  | { type: 'transcript'; text: string }
+  | { type: 'sentence'; idx: number; hu: string }
+  | { type: 'audio'; idx: number; base64: string }
+  | { type: 'done'; fullHu: string };
 
 export interface TutorEvalLogEntry {
   topic: string;
