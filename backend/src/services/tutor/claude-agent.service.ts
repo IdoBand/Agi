@@ -54,6 +54,13 @@ interface BilingualReply {
 }
 
 function parseBilingualReply(raw: string): BilingualReply {
+  const huMatch = raw.match(/<hu>([\s\S]*?)<\/hu>/i);
+  const enMatch = raw.match(/<en>([\s\S]*?)<\/en>/i);
+  if (huMatch) {
+    const hu = huMatch[1].trim();
+    const en = enMatch ? enMatch[1].trim() : '';
+    if (hu) return { hu, en };
+  }
   let s = raw.trim();
   if (s.startsWith('```')) {
     s = s.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
@@ -70,11 +77,10 @@ function parseBilingualReply(raw: string): BilingualReply {
       const en = (parsed as { en: string }).en.trim();
       if (hu) return { hu, en };
     }
-    logger.warn(`[tutor-agent] bilingual parse: invalid shape`);
-  } catch (e) {
-    logger.warn(`[tutor-agent] bilingual parse failed: ${e}`);
-  }
-  return { hu: raw.trim(), en: '' };
+  } catch { /* fall through */ }
+  logger.warn(`[tutor-agent] bilingual parse failed; raw len=${raw.length}`);
+  const stripped = raw.replace(/<\/?(hu|en)>/gi, '').trim();
+  return { hu: stripped, en: '' };
 }
 
 function ensureInit(): void {
