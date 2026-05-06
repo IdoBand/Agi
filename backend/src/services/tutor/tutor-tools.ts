@@ -1,11 +1,12 @@
 import { z } from 'zod';
 import { tool, createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk';
 import { listKnowledge, getKnowledgeFile } from './knowledge.service.js';
-import { getRandomQuestionMeta } from '../quiz.service.js';
+import { getAllQuestionMetas } from '../quiz.service.js';
 import { TutorEvalLogEntry } from '../../types/tutor.types.js';
 import { logger } from '../../utils/logger.js';
 
 const evalLogs = new Map<string, TutorEvalLogEntry[]>();
+const askedQuestions = new Map<string, Set<string>>();
 
 export function appendEvalLog(sessionId: string, entry: TutorEvalLogEntry): void {
   const list = evalLogs.get(sessionId) ?? [];
@@ -21,11 +22,24 @@ export function dropEvalLog(sessionId: string): void {
   evalLogs.delete(sessionId);
 }
 
+export function dropAskedQuestions(sessionId: string): void {
+  askedQuestions.delete(sessionId);
+}
+
 function ok(text: string) {
   return { content: [{ type: 'text' as const, text }] };
 }
 function err(message: string) {
   return { content: [{ type: 'text' as const, text: JSON.stringify({ error: message }) }], isError: true };
+}
+
+function shuffle<T>(arr: T[]): T[] {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
 }
 
 export function buildTutorMcpServer(sessionId: string) {
@@ -61,16 +75,23 @@ export function buildTutorMcpServer(sessionId: string) {
 
   const drawTool = tool(
     'drawPracticeQuestion',
-    'Draw a random practice question (Hungarian Q&A pair) from the question bank.',
+    'Draw a random practice question (Hungarian Q&A pair) from the question bank. Server filters out IDs already served this session.',
     { category: z.string().optional().describe('optional category filter') },
     async (args) => {
       try {
-        const qs = await getRandomQuestionMeta(8);
-        const filtered = args.category
-          ? qs.filter((q) => q.category.toLowerCase() === args.category!.toLowerCase())
-          : qs;
-        const pick = (filtered.length ? filtered : qs)[0];
-        if (!pick) return err('no questions available');
+        const all = await getAllQuestionMetas();
+        const asked = askedQuestions.get(sessionId) ?? new Set<string>();
+        const byCategory = args.category
+          ? all.filter((q) => q.category.toLowerCase() === args.category!.toLowerCase())
+          : all;
+        const fresh = byCategory.filter((q) => !asked.has(q.id));
+        const pool = fresh.length ? fresh : [];
+        if (!pool.length) {
+          return err(args.category ? `no more questions in category "${args.category}"` : 'no more questions available');
+        }
+        const pick = shuffle(pool)[0];
+        asked.add(pick.id);
+        askedQuestions.set(sessionId, asked);
         return ok(JSON.stringify({
           id: pick.id,
           question: pick.question,

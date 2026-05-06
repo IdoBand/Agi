@@ -68,6 +68,10 @@ export async function getRandomQuestionMeta(count: number): Promise<Question[]> 
   return shuffle(questions).slice(0, count);
 }
 
+export async function getAllQuestionMetas(): Promise<Question[]> {
+  return loadQuestions();
+}
+
 export async function getRandomQuestions(count: number): Promise<QuizQuestion[]> {
   const questions = await loadQuestions();
   const selected = shuffle(questions).slice(0, count);

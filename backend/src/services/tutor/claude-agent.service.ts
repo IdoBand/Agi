@@ -1,14 +1,17 @@
-import { query } from '@anthropic-ai/claude-agent-sdk';
+import { randomUUID } from 'crypto';
+import { query, deleteSession } from '@anthropic-ai/claude-agent-sdk';
 import { config } from '../../config/index.js';
 import { logger } from '../../utils/logger.js';
 import { CITIZENSHIP_INTERVIEW_PROMPT } from './system-prompt.js';
-import { buildTutorMcpServer, TUTOR_TOOL_NAMES, dropEvalLog } from './tutor-tools.js';
+import { buildTutorMcpServer, TUTOR_TOOL_NAMES, dropEvalLog, dropAskedQuestions } from './tutor-tools.js';
 import { ToolCallTrace, TurnTrace } from '../../types/tutor.types.js';
 import { appendTurnTrace, rotateSessionTrace } from './session-trace.js';
 
 interface SessionState {
   lastTouched: number;
-  history: Array<{ role: 'user' | 'assistant'; text: string }>;
+  sdkSessionId: string;
+  turnCount: number;
+  lastReply?: string;
 }
 
 const sessions = new Map<string, SessionState>();
@@ -16,13 +19,23 @@ const SESSION_TTL_MS = 60 * 60 * 1000;
 
 const FALLBACK_HU = 'Bocsánat, nem hallottam jól. Mondanád újra?';
 
+async function purge(sessionId: string, sdkSessionId: string): Promise<void> {
+  sessions.delete(sessionId);
+  dropEvalLog(sessionId);
+  dropAskedQuestions(sessionId);
+  void rotateSessionTrace(sessionId);
+  try {
+    await deleteSession(sdkSessionId);
+  } catch (e) {
+    logger.warn(`[tutor-agent] deleteSession failed for ${sdkSessionId}: ${e}`);
+  }
+}
+
 function sweep(): void {
   const now = Date.now();
   for (const [id, s] of sessions) {
     if (now - s.lastTouched > SESSION_TTL_MS) {
-      sessions.delete(id);
-      dropEvalLog(id);
-      void rotateSessionTrace(id);
+      void purge(id, s.sdkSessionId);
     }
   }
 }
@@ -48,14 +61,6 @@ function ensureInit(): void {
   if (!config.anthropic.apiKey) {
     throw new Error('ANTHROPIC_API_KEY is not set; tutor mode unavailable.');
   }
-}
-
-function buildPrompt(history: SessionState['history'], userText: string): string {
-  if (history.length === 0) return userText;
-  const transcript = history
-    .map((m) => (m.role === 'user' ? `Learner: ${m.text}` : `Tutor: ${m.text}`))
-    .join('\n');
-  return `${transcript}\nLearner: ${userText}`;
 }
 
 const SENTENCE_BOUNDARY = /([^.!?…\n]+[.!?…]+|\S[^\n]*\n)/g;
@@ -89,10 +94,14 @@ export async function* runTurnStream(
   ensureInit();
   sweep();
 
-  const state = sessions.get(sessionId) ?? { lastTouched: Date.now(), history: [] };
+  const state = sessions.get(sessionId) ?? {
+    lastTouched: Date.now(),
+    sdkSessionId: randomUUID(),
+    turnCount: 0,
+  };
+  const isFirstTurn = state.turnCount === 0;
 
   const mcpServer = buildTutorMcpServer(sessionId);
-  const prompt = buildPrompt(state.history, userText);
 
   let assistantText = '';
   let buffer = '';
@@ -113,7 +122,7 @@ export async function* runTurnStream(
 
   try {
     const q = query({
-      prompt,
+      prompt: userText,
       options: {
         model: config.anthropic.model,
         systemPrompt: CITIZENSHIP_INTERVIEW_PROMPT,
@@ -123,7 +132,7 @@ export async function* runTurnStream(
         permissionMode: 'bypassPermissions',
         allowDangerouslySkipPermissions: true,
         settingSources: [],
-        persistSession: false,
+        ...(isFirstTurn ? { sessionId: state.sdkSessionId } : { resume: state.sdkSessionId }),
         env: { ...process.env, ANTHROPIC_API_KEY: config.anthropic.apiKey },
       },
     });
@@ -183,9 +192,9 @@ export async function* runTurnStream(
     }
   }
 
-  state.history.push({ role: 'user', text: userText });
-  state.history.push({ role: 'assistant', text: fullHu });
+  state.turnCount += 1;
   state.lastTouched = Date.now();
+  state.lastReply = fullHu;
   sessions.set(sessionId, state);
 
   const trace: TurnTrace = {
@@ -201,16 +210,16 @@ export async function* runTurnStream(
 }
 
 export function getLastAssistantReply(sessionId: string): string | undefined {
-  const s = sessions.get(sessionId);
-  if (!s) return undefined;
-  for (let i = s.history.length - 1; i >= 0; i--) {
-    if (s.history[i].role === 'assistant') return s.history[i].text;
-  }
-  return undefined;
+  return sessions.get(sessionId)?.lastReply;
 }
 
 export function resetSession(sessionId: string): void {
-  void rotateSessionTrace(sessionId);
-  sessions.delete(sessionId);
-  dropEvalLog(sessionId);
+  const s = sessions.get(sessionId);
+  if (!s) {
+    void rotateSessionTrace(sessionId);
+    dropEvalLog(sessionId);
+    dropAskedQuestions(sessionId);
+    return;
+  }
+  void purge(sessionId, s.sdkSessionId);
 }
