@@ -15,7 +15,7 @@ interface TranslateResponse {
 }
 
 export function TutorControlPanel({ phase, sessionId, transcript, micSelected, onStart, onReset }: Props) {
-  const [showHistory, setShowHistory] = useState(false);
+  const [showHistory, setShowHistory] = useState(true);
   const [englishIdxs, setEnglishIdxs] = useState<Set<number>>(new Set());
   const [translations, setTranslations] = useState<Record<number, string>>({});
   const [loadingIdxs, setLoadingIdxs] = useState<Set<number>>(new Set());
@@ -92,20 +92,38 @@ export function TutorControlPanel({ phase, sessionId, transcript, micSelected, o
 
   return (
     <div className="w-full flex flex-col gap-3 flex-1 min-h-0">
-      <div className="flex items-center justify-between text-sm">
+      <div className="flex items-center text-sm gap-2">
         <button
           onClick={() => setShowHistory((v) => !v)}
           className="text-gray-300 hover:text-white underline"
         >
           {showHistory ? 'Hide' : 'Show'} transcript ({transcript.length})
         </button>
+        <div className="flex-1 flex items-center justify-center min-h-[1.5rem]">
+          {phase === 'thinking' && (
+            <div className="flex items-center gap-3 text-white">
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <span className="font-medium">Thinking...</span>
+            </div>
+          )}
+          {phase === 'speaking' && (
+            <div className="flex items-center gap-3 text-white">
+              <div className="flex gap-1">
+                <div className="w-1 h-4 bg-white animate-bounce" style={{ animationDelay: '0ms' }} />
+                <div className="w-1 h-4 bg-white animate-bounce" style={{ animationDelay: '150ms' }} />
+                <div className="w-1 h-4 bg-white animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
+              <span className="font-medium">Speaking...</span>
+            </div>
+          )}
+        </div>
         <button onClick={onReset} className="text-red-300 hover:text-red-200 underline">
           Reset session
         </button>
       </div>
 
       {showHistory && (
-        <div ref={transcriptRef} className="flex-1 min-h-0 overflow-y-auto bg-black/30 rounded p-2 text-sm flex flex-col gap-2">
+        <div ref={transcriptRef} className="scrollbar-milky flex-1 min-h-0 overflow-y-auto bg-white/10 rounded p-2 text-sm text-gray-100 flex flex-col gap-2">
           {transcript.length === 0 && <div className="text-gray-400 italic">No turns yet.</div>}
           {transcript.map((m, i) => {
             const isAssistant = m.role === 'assistant';
@@ -124,7 +142,7 @@ export function TutorControlPanel({ phase, sessionId, transcript, micSelected, o
                 {isAssistant && m.text && (
                   <button
                     onClick={() => toggleLang(i, m.text)}
-                    className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 ml-1 mr-1 align-middle"
+                    className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 text-gray-200 ml-1 mr-1 align-middle"
                     disabled={loading}
                   >
                     {showEn ? 'HU' : 'EN'}
@@ -143,25 +161,6 @@ export function TutorControlPanel({ phase, sessionId, transcript, micSelected, o
           })}
         </div>
       )}
-
-      <div className="animate-fadeIn">
-        {phase === 'thinking' && (
-          <div className="flex items-center justify-center gap-3 text-white">
-            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            <span className="font-medium">Thinking...</span>
-          </div>
-        )}
-        {phase === 'speaking' && (
-          <div className="flex items-center justify-center gap-3 text-white">
-            <div className="flex gap-1">
-              <div className="w-1 h-4 bg-white animate-bounce" style={{ animationDelay: '0ms' }} />
-              <div className="w-1 h-4 bg-white animate-bounce" style={{ animationDelay: '150ms' }} />
-              <div className="w-1 h-4 bg-white animate-bounce" style={{ animationDelay: '300ms' }} />
-            </div>
-            <span className="font-medium">Speaking...</span>
-          </div>
-        )}
-      </div>
     </div>
   );
 }
