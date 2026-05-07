@@ -6,6 +6,7 @@ import { AvatarProps } from '../types/avatar.types';
 import { MouthCue } from '../types/message.types';
 import { visemeMapping, allVisemes, lerp } from '../utils/lipsync';
 import { getAudioContext } from '../utils/audioContext';
+import { setSharedAnalyser } from '../utils/sharedAnalyser';
 import {
   facialExpressions,
   allExpressionMorphTargets,
@@ -27,6 +28,13 @@ export function Avatar({
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
   const amplitudeBufferRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
   const mouthOpenRef = useRef<number>(0);
+
+  // Clear shared analyser only on full unmount, so subsequent messages can reuse it.
+  useEffect(() => {
+    return () => {
+      setSharedAnalyser(null);
+    };
+  }, []);
 
   // Create audio element and handle playback
   useEffect(() => {
@@ -53,6 +61,7 @@ export function Avatar({
       analyser.connect(audioContext.destination);
       analyserRef.current = analyser;
       amplitudeBufferRef.current = new Uint8Array(new ArrayBuffer(analyser.fftSize));
+      setSharedAnalyser(analyser);
     }
 
     const sourceNode = audioContext.createMediaElementSource(audioElement);

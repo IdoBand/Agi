@@ -2,6 +2,7 @@ import { Canvas } from '@react-three/fiber';
 import { Suspense, useCallback, useRef, useState } from 'react';
 import { Experience } from './components/Experience';
 import { MediaConsole } from './components/MediaConsole';
+import { SpeechBubbleVisualizer } from './components/SpeechBubbleVisualizer';
 import { QuizMode } from './components/QuizMode';
 import { TutorChatMode } from './components/TutorChatMode';
 import { useVoiceRecorder } from './hooks/useVoiceRecorder';
@@ -120,6 +121,8 @@ export default function App() {
             />
           </Suspense>
         </Canvas>
+
+        <SpeechBubbleVisualizer />
 
         <MediaConsole recorder={recorder} pttAvailable={pttAvailable} />
 
