@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { query, deleteSession } from '@anthropic-ai/claude-agent-sdk';
 import { config } from '../../config/index.js';
 import { logger } from '../../utils/logger.js';
-import { CITIZENSHIP_INTERVIEW_PROMPT } from './system-prompt.js';
+import { ACTIVE_CITIZENSHIP_INTERVIEW_PROMPT } from './system-prompt.js';
 import { buildTutorMcpServer, TUTOR_TOOL_NAMES, dropEvalLog, dropAskedQuestions } from './tutor-tools.js';
 import { ToolCallTrace, TurnTrace } from '../../types/tutor.types.js';
 import { appendTurnTrace, rotateSessionTrace } from './session-trace.js';
@@ -125,7 +125,7 @@ export async function* runTurnStream(
       prompt: userText,
       options: {
         model: config.anthropic.model,
-        systemPrompt: CITIZENSHIP_INTERVIEW_PROMPT,
+        systemPrompt: ACTIVE_CITIZENSHIP_INTERVIEW_PROMPT,
         mcpServers: { tutor: mcpServer },
         allowedTools: TUTOR_TOOL_NAMES,
         tools: [],

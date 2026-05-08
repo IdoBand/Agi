@@ -10,6 +10,12 @@ function parseSTTProvider(value: string | undefined): STTProvider {
   return 'whisper';
 }
 
+export type TutorPromptVariant = 'baseline' | 'bilingual';
+
+function parsePromptVariant(value: string | undefined): TutorPromptVariant {
+  return value === 'baseline' ? 'baseline' : 'bilingual';
+}
+
 export const config = {
   port: parseInt(process.env.PORT || '3000', 10),
 
@@ -53,6 +59,7 @@ export const config = {
 
   tutor: {
     knowledgeDir: path.resolve(process.env.TUTOR_KNOWLEDGE_DIR || './knowledge'),
+    promptVariant: parsePromptVariant(process.env.TUTOR_PROMPT_VARIANT),
   },
 
   paths: {
