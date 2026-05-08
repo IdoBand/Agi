@@ -64,7 +64,7 @@ export function QuizControlPanel({
   // Idle: standalone centered button, no panel
   if (phase === 'idle') {
     return (
-      <div className="flex flex-col items-center gap-2 w-full">
+      <div className="mt-auto flex flex-col items-center gap-2 w-full">
         {!micSelected && (
           <span className="text-yellow-400 text-sm">Select a microphone first</span>
         )}
@@ -85,7 +85,7 @@ export function QuizControlPanel({
 
   // All other phases: bottom panel
   return (
-    <div className="w-full flex flex-col gap-3">
+    <div className="mt-auto w-full flex flex-col gap-3">
       {/* Top row: score ratio + text toggle */}
       <div className="flex items-center justify-between mb-3">
         {totalQuestions > 0 ? (

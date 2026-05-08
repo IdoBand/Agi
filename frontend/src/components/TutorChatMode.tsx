@@ -29,15 +29,13 @@ export function TutorChatMode({ recorder, onMessage, onAudioEndRef, onPttAvailab
   }, [tutor.onAssistantAudioEnd, onAudioEndRef]);
 
   return (
-    <div className="mt-auto">
-      <TutorControlPanel
-        phase={tutor.phase}
-        sessionId={tutor.sessionId}
-        transcript={tutor.transcript}
-        micSelected={!!recorder.selectedDeviceId}
-        onStart={tutor.startSession}
-        onReset={tutor.resetSession}
-      />
-    </div>
+    <TutorControlPanel
+      phase={tutor.phase}
+      sessionId={tutor.sessionId}
+      transcript={tutor.transcript}
+      micSelected={!!recorder.selectedDeviceId}
+      onStart={tutor.startSession}
+      onReset={tutor.resetSession}
+    />
   );
 }

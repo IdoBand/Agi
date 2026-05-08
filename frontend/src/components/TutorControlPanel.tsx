@@ -75,7 +75,7 @@ export function TutorControlPanel({ phase, sessionId, transcript, micSelected, o
 
   if (!sessionId) {
     return (
-      <div className="flex flex-col items-center gap-2 w-full">
+      <div className="mt-auto flex flex-col items-center gap-2 w-full">
         {!micSelected && <span className="text-yellow-400 text-sm">Select a microphone first</span>}
         <button
           onClick={onStart}

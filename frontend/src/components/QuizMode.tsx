@@ -40,25 +40,23 @@ export function QuizMode({ recorder, onMessage, onAudioEndRef, onPttAvailableCha
           correctAnswer={quiz.currentCorrectAnswer}
         />
       )}
-      <div className="mt-auto">
-        <QuizControlPanel
-          phase={quiz.phase}
-          isRecording={quiz.isRecording}
-          currentIndex={quiz.currentIndex}
-          totalQuestions={quiz.totalQuestions}
-          score={quiz.score}
-          currentQuestionText={quiz.currentQuestionText}
-          micSelected={!!recorder.selectedDeviceId}
-          isAudioPlaying={quiz.isAudioPlaying}
-          hasRecordedAnswer={quiz.hasRecordedAnswer}
-          evaluationStartTime={quiz.evaluationStartTime}
-          onStartQuiz={quiz.startQuiz}
-          onSendAnswer={quiz.sendAnswer}
-          onNextQuestion={quiz.nextQuestion}
-          onReplayQuestion={quiz.replayQuestionAudio}
-          onPlayRecordedAnswer={quiz.playRecordedAnswer}
-        />
-      </div>
+      <QuizControlPanel
+        phase={quiz.phase}
+        isRecording={quiz.isRecording}
+        currentIndex={quiz.currentIndex}
+        totalQuestions={quiz.totalQuestions}
+        score={quiz.score}
+        currentQuestionText={quiz.currentQuestionText}
+        micSelected={!!recorder.selectedDeviceId}
+        isAudioPlaying={quiz.isAudioPlaying}
+        hasRecordedAnswer={quiz.hasRecordedAnswer}
+        evaluationStartTime={quiz.evaluationStartTime}
+        onStartQuiz={quiz.startQuiz}
+        onSendAnswer={quiz.sendAnswer}
+        onNextQuestion={quiz.nextQuestion}
+        onReplayQuestion={quiz.replayQuestionAudio}
+        onPlayRecordedAnswer={quiz.playRecordedAnswer}
+      />
     </>
   );
 }
