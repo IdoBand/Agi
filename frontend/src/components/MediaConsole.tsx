@@ -44,7 +44,7 @@ export function MediaConsole({ recorder, pttAvailable }: Props) {
   return (
     <div
       ref={wrapRef}
-      className="absolute top-3 left-1/2 -translate-x-1/2 z-20 inline-flex h-9 items-center rounded-full bg-gray-900/80 backdrop-blur border border-gray-700 shadow-lg"
+      className="absolute top-3 left-3 z-20 inline-flex h-9 items-center rounded-full bg-gray-900/80 backdrop-blur border border-gray-700 shadow-lg"
     >
       <div className="relative flex items-center px-3 gap-2">
         <button

@@ -3,12 +3,12 @@ import { getSharedAnalyser } from '../utils/sharedAnalyser';
 import { lerp } from '../utils/lipsync';
 
 const POINT_COUNT = 48;
-const VIEW_W = 60;
-const VIEW_H = 60;
+const VIEW_W = 45;
+const VIEW_H = 36;
 const BASELINE_Y = VIEW_H / 2;
 const PAD_X = 0;
-const WAVE_SCALE = 9;
-const NOISE_SCALE = 3;
+const WAVE_SCALE = 5;
+const NOISE_SCALE = 2;
 const LERP_ALPHA = 0.35;
 
 export function SpeechBubbleVisualizer() {
@@ -89,7 +89,7 @@ export function SpeechBubbleVisualizer() {
   }, []);
 
   return (
-    <div className="absolute top-[52px] left-1/2 -translate-x-1/2 w-[60px] h-[60px] pointer-events-none z-20">
+    <div className="absolute top-3 left-1/2 -translate-x-1/2 w-[45px] h-[36px] pointer-events-none z-20">
       <svg
         viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
         width={VIEW_W}
@@ -98,13 +98,16 @@ export function SpeechBubbleVisualizer() {
       >
         <defs>
           <clipPath id="bubbleClip">
-            <circle cx={VIEW_W / 2} cy={VIEW_H / 2} r={VIEW_W / 2 - 4} />
+            <rect x={1} y={1} width={VIEW_W - 2} height={VIEW_H - 2} rx={(VIEW_H - 2) / 2} ry={(VIEW_H - 2) / 2} />
           </clipPath>
         </defs>
-        <circle
-          cx={VIEW_W / 2}
-          cy={VIEW_H / 2}
-          r={VIEW_W / 2 - 4}
+        <rect
+          x={0.5}
+          y={0.5}
+          width={VIEW_W - 1}
+          height={VIEW_H - 1}
+          rx={(VIEW_H - 1) / 2}
+          ry={(VIEW_H - 1) / 2}
           fill="#111827"
           stroke="#374151"
           strokeWidth={1}
@@ -113,7 +116,7 @@ export function SpeechBubbleVisualizer() {
           ref={pathRef}
           fill="none"
           stroke="rgba(255,255,255,0.95)"
-          strokeWidth={2}
+          strokeWidth={1}
           strokeLinecap="round"
           strokeLinejoin="round"
           clipPath="url(#bubbleClip)"
