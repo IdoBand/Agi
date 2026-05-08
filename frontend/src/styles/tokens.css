@@ -1,0 +1,39 @@
+:root {
+  /* Colors */
+  --color-text-primary: #ffffff;
+  --color-surface-console: rgba(17, 24, 39, 0.8);   /* gray-900/80, MediaConsole bg */
+  --color-border-console: #374151;                   /* gray-700, MediaConsole border */
+  --color-accent-primary: #2563eb;                   /* blue-600, primary button */
+  --color-accent-primary-hover: #1d4ed8;             /* blue-700 */
+  --color-text-secondary: #e5e7eb;                   /* gray-200 */
+  --color-text-muted: #9ca3af;                       /* gray-400 */
+  --color-surface-menu: #111827;                     /* gray-900, dropdown bg */
+  --color-surface-hover: #1f2937;                    /* gray-800, menu hover */
+  --color-accent-selected: #60a5fa;                  /* blue-400, selected device */
+  --color-recording: #ef4444;                        /* red-500, rec dot */
+
+  /* Gradients */
+  --gradient-sidebar: linear-gradient(
+    to bottom,
+    #02152b 0%,
+    #062a4a 25%,
+    #1f4f7a 55%,
+    #5f7fa0 75%,
+    #c3b0b6 100%
+  );
+}
+
+/* Reusable scrollbar */
+.scrollbar-milky {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+.scrollbar-milky::-webkit-scrollbar { width: 6px; height: 6px; }
+.scrollbar-milky::-webkit-scrollbar-track { background: transparent; }
+.scrollbar-milky::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+.scrollbar-milky::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.35);
+}

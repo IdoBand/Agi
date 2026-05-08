@@ -10,10 +10,6 @@ import { Message } from './types/message.types';
 
 type Mode = 'quiz' | 'tutor';
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const SIDEBAR_GRADIENT_BG =
-  'linear-gradient(to bottom, #02152b 0%, #062a4a 25%, #1f4f7a 55%, #5f7fa0 75%, #c3b0b6 100%)';
-
 function LoadingOverlay() {
   return (
     <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-50">

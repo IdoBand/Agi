@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { useVoiceRecorder } from '../hooks/useVoiceRecorder';
+import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
+import styles from './MediaConsole.module.css';
 
 interface Props {
   recorder: ReturnType<typeof useVoiceRecorder>;
@@ -16,7 +17,7 @@ function MicIcon() {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="w-4 h-4"
+      className={styles.icon}
     >
       <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
       <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
@@ -42,22 +43,19 @@ export function MediaConsole({ recorder, pttAvailable }: Props) {
   const showRight = recorder.isRecording || pttAvailable;
 
   return (
-    <div
-      ref={wrapRef}
-      className="absolute top-3 left-3 z-20 inline-flex h-9 items-center rounded-full bg-gray-900/80 backdrop-blur border border-gray-700 shadow-lg"
-    >
-      <div className="relative flex items-center px-3 gap-2">
+    <div ref={wrapRef} className={styles.wrap}>
+      <div className={styles.left}>
         <button
           onClick={() => setOpen((v) => !v)}
-          className="text-gray-200 hover:text-white"
+          className={styles['mic-btn']}
           title={recorder.selectedDeviceId ? 'Change microphone' : 'Select microphone'}
         >
           <MicIcon />
         </button>
         {open && (
-          <div className="absolute top-full mt-1 left-0 min-w-[220px] bg-gray-900 border border-gray-700 rounded-lg shadow-xl py-1 max-h-64 overflow-y-auto">
+          <div className={`${styles.menu} scrollbar-milky`}>
             {recorder.devices.length === 0 && (
-              <div className="px-3 py-2 text-sm text-gray-400">No microphones found</div>
+              <div className={styles['menu-empty']}>No microphones found</div>
             )}
             {recorder.devices.map((d) => {
               const selected = d.deviceId === recorder.selectedDeviceId;
@@ -68,9 +66,7 @@ export function MediaConsole({ recorder, pttAvailable }: Props) {
                     recorder.setSelectedDeviceId(d.deviceId);
                     setOpen(false);
                   }}
-                  className={`w-full text-left px-3 py-1.5 text-sm hover:bg-gray-800 ${
-                    selected ? 'text-blue-400' : 'text-gray-200'
-                  }`}
+                  className={`${styles['menu-item']} ${selected ? styles['menu-item--selected'] : ''}`}
                 >
                   {d.label || `Microphone ${d.deviceId.slice(0, 8)}`}
                 </button>
@@ -82,11 +78,11 @@ export function MediaConsole({ recorder, pttAvailable }: Props) {
 
       {showRight && (
         <>
-          <div className="w-px h-5 bg-gray-700" />
-          <div className="flex items-center px-3 gap-2 text-sm text-gray-200">
+          <div className={styles.divider} />
+          <div className={styles.right}>
             {recorder.isRecording ? (
               <>
-                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                <div className={styles['rec-dot']} />
                 <span>Recording...</span>
               </>
             ) : (
