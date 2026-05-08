@@ -65,6 +65,9 @@ export function QuizControlPanel({
   if (phase === 'idle') {
     return (
       <div className="flex flex-col items-center gap-2 w-full">
+        {!micSelected && (
+          <span className="text-yellow-400 text-sm">Select a microphone first</span>
+        )}
         <button
           onClick={onStartQuiz}
           disabled={!micSelected}
@@ -76,9 +79,6 @@ export function QuizControlPanel({
         >
           Start Quiz
         </button>
-        {!micSelected && (
-          <span className="text-yellow-400 text-sm">Select a microphone first</span>
-        )}
       </div>
     );
   }
