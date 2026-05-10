@@ -21,6 +21,8 @@ export const config = {
 
   stt: {
     provider: parseSTTProvider(process.env.STT_PROVIDER),
+    temperature: parseFloat(process.env.STT_TEMPERATURE ?? '0'),
+    temperatureInc: parseFloat(process.env.STT_TEMPERATURE_INC ?? '0'),
   },
 
   ollama: {

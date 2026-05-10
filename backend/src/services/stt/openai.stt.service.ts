@@ -20,6 +20,7 @@ export class OpenAISTTService implements ISTTService {
         file: fs.createReadStream(audioPath),
         model: config.openai.sttModel,
         language: 'hu',
+        ...(config.stt.temperature >= 0 ? { temperature: config.stt.temperature } : {}),
         ...(prompt ? { prompt } : {}),
       });
 

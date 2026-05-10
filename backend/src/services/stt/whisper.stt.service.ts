@@ -95,6 +95,8 @@ export class WhisperSTTService implements ISTTService {
       form.append('file', blob, path.basename(wavPath));
       form.append('language', 'hu');
       form.append('response_format', 'json');
+      if (config.stt.temperature >= 0) form.append('temperature', String(config.stt.temperature));
+      if (config.stt.temperatureInc >= 0) form.append('temperature_inc', String(config.stt.temperatureInc));
       if (prompt) form.append('initial_prompt', prompt);
 
       logger.debug(`Sending audio to whisper-server at port ${config.whisper.serverPort}`);
