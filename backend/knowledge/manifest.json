@@ -11,6 +11,12 @@
       "title": "Citizenship interview — basis & family questions",
       "summary": "Hungarian citizenship Q&A on basis of application, ancestry (grandparents), language exposure. Categories: állampolgárság, Nyelvtudás.",
       "tags": ["citizenship", "ancestry", "language", "hungarian"]
+    },
+    {
+      "path": "citizenship/mergedQuestions.json",
+      "title": "Citizenship interview — merged bank (ordered + images2)",
+      "summary": "Unified Hungarian citizenship Q&A bank: 189 ordered + 12 unique images2 = 201 entries. Schema {id, question, answer, englishTranslation, category}. Loaders read this file.",
+      "tags": ["citizenship", "interview", "hungarian", "merged"]
     }
   ]
 }

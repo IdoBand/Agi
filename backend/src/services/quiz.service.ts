@@ -15,8 +15,7 @@ const EvalResponseSchema = z.object({
   explanation: z.string(),
 });
 
-const QUESTIONS_PATH = path.resolve('knowledge/citizenship/images2Questions.json');
-// const QUESTIONS_PATH = path.resolve('knowledge/citizenship/orderedQuestions.json');
+const QUESTIONS_PATH = path.resolve('knowledge/citizenship/mergedQuestions.json');
 const AUDIO_DIR = path.resolve('assets/questionsAudio');
 
 let questionsCache: Question[] | null = null;

@@ -3,8 +3,8 @@ backend/bin/rhubarb/
 backend/bin/ffmpeg/
 
 
-orderedQuestions.json
-images2Questions.json
+# Citizenship question banks (personal data — never commit)
+backend/knowledge/citizenship/
 
 
 # Dependencies
