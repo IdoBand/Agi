@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { tool, createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk';
+import { tool } from '@langchain/core/tools';
+import type { StructuredToolInterface } from '@langchain/core/tools';
 import { listKnowledge, getKnowledgeFile } from './knowledge.service.js';
 import { getAllQuestionMetas } from '../quiz.service.js';
 import { TutorEvalLogEntry } from '../../types/tutor.types.js';
@@ -26,13 +27,6 @@ export function dropAskedQuestions(sessionId: string): void {
   askedQuestions.delete(sessionId);
 }
 
-function ok(text: string) {
-  return { content: [{ type: 'text' as const, text }] };
-}
-function err(message: string) {
-  return { content: [{ type: 'text' as const, text: JSON.stringify({ error: message }) }], isError: true };
-}
-
 function shuffle<T>(arr: T[]): T[] {
   const copy = [...arr];
   for (let i = copy.length - 1; i > 0; i--) {
@@ -42,42 +36,43 @@ function shuffle<T>(arr: T[]): T[] {
   return copy;
 }
 
-export function buildTutorMcpServer(sessionId: string) {
+export function buildTutorTools(sessionId: string): StructuredToolInterface[] {
   const listTool = tool(
-    'listKnowledge',
-    'List all curated knowledge files (titles, summaries, tags). Call this once at session start.',
-    {},
     async () => {
       try {
         const entries = await listKnowledge();
-        return ok(JSON.stringify({ entries }));
+        return JSON.stringify({ entries });
       } catch (e) {
         logger.error(`[tutor-tool listKnowledge] ${e}`);
-        return err((e as Error).message);
+        throw e;
       }
-    }
+    },
+    {
+      name: 'listKnowledge',
+      description: 'List all curated knowledge files (titles, summaries, tags). Call this once at session start.',
+      schema: z.object({}),
+    },
   );
 
   const readTool = tool(
-    'readKnowledge',
-    'Read the full contents of a curated knowledge file by its manifest path.',
-    { path: z.string().describe('manifest path, e.g. "numbers.md"') },
-    async (args) => {
+    async (args: { path: string }) => {
       try {
         const content = await getKnowledgeFile(args.path);
-        return ok(JSON.stringify({ content }));
+        return JSON.stringify({ content });
       } catch (e) {
         logger.error(`[tutor-tool readKnowledge] ${e}`);
-        return err((e as Error).message);
+        throw e;
       }
-    }
+    },
+    {
+      name: 'readKnowledge',
+      description: 'Read the full contents of a curated knowledge file by its manifest path.',
+      schema: z.object({ path: z.string().describe('manifest path, e.g. "numbers.md"') }),
+    },
   );
 
   const drawTool = tool(
-    'drawPracticeQuestion',
-    'Draw a random practice question (Hungarian Q&A pair) from the question bank. Server filters out IDs already served this session.',
-    { category: z.string().optional().describe('optional category filter') },
-    async (args) => {
+    async (args: { category?: string }) => {
       try {
         const all = await getAllQuestionMetas();
         const asked = askedQuestions.get(sessionId) ?? new Set<string>();
@@ -87,49 +82,45 @@ export function buildTutorMcpServer(sessionId: string) {
         const fresh = byCategory.filter((q) => !asked.has(q.id));
         const pool = fresh.length ? fresh : [];
         if (!pool.length) {
-          return err(args.category ? `no more questions in category "${args.category}"` : 'no more questions available');
+          throw new Error(args.category ? `no more questions in category "${args.category}"` : 'no more questions available');
         }
         const pick = shuffle(pool)[0];
         asked.add(pick.id);
         askedQuestions.set(sessionId, asked);
-        return ok(JSON.stringify({
+        return JSON.stringify({
           id: pick.id,
           question: pick.question,
           answer: pick.answer,
           englishTranslation: pick.englishTranslation,
           category: pick.category,
-        }));
+        });
       } catch (e) {
         logger.error(`[tutor-tool drawPracticeQuestion] ${e}`);
-        return err((e as Error).message);
+        throw e;
       }
-    }
+    },
+    {
+      name: 'drawPracticeQuestion',
+      description: 'Draw a random practice question (Hungarian Q&A pair) from the question bank. Server filters out IDs already served this session.',
+      schema: z.object({ category: z.string().optional().describe('optional category filter') }),
+    },
   );
 
   const recordTool = tool(
-    'recordEvaluation',
-    'Record an evaluation of the learner\'s answer for self-tracking. Does not affect the conversation.',
-    {
-      topic: z.string(),
-      correct: z.boolean(),
-      note: z.string(),
-    },
-    async (args) => {
+    async (args: { topic: string; correct: boolean; note: string }) => {
       appendEvalLog(sessionId, { topic: args.topic, correct: args.correct, note: args.note, at: Date.now() });
-      return ok(JSON.stringify({ ok: true }));
-    }
+      return JSON.stringify({ ok: true });
+    },
+    {
+      name: 'recordEvaluation',
+      description: "Record an evaluation of the learner's answer for self-tracking. Does not affect the conversation.",
+      schema: z.object({
+        topic: z.string(),
+        correct: z.boolean(),
+        note: z.string(),
+      }),
+    },
   );
 
-  return createSdkMcpServer({
-    name: 'tutor',
-    version: '0.1.0',
-    tools: [listTool, readTool, drawTool, recordTool],
-  });
+  return [listTool, readTool, drawTool, recordTool] as StructuredToolInterface[];
 }
-
-export const TUTOR_TOOL_NAMES = [
-  'mcp__tutor__listKnowledge',
-  'mcp__tutor__readKnowledge',
-  'mcp__tutor__drawPracticeQuestion',
-  'mcp__tutor__recordEvaluation',
-];

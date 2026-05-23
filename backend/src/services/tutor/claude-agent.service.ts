@@ -1,15 +1,18 @@
 import { randomUUID } from 'crypto';
-import { query, deleteSession } from '@anthropic-ai/claude-agent-sdk';
+import { ChatAnthropic } from '@langchain/anthropic';
+import { createReactAgent } from '@langchain/langgraph/prebuilt';
+import { MemorySaver } from '@langchain/langgraph';
+import { HumanMessage } from '@langchain/core/messages';
 import { config } from '../../config/index.js';
 import { logger } from '../../utils/logger.js';
 import { ACTIVE_CITIZENSHIP_INTERVIEW_PROMPT } from './system-prompt.js';
-import { buildTutorMcpServer, TUTOR_TOOL_NAMES, dropEvalLog, dropAskedQuestions } from './tutor-tools.js';
+import { buildTutorTools, dropEvalLog, dropAskedQuestions } from './tutor-tools.js';
 import { ToolCallTrace, TurnTrace } from '../../types/tutor.types.js';
 import { appendTurnTrace, rotateSessionTrace } from './session-trace.js';
 
 interface SessionState {
   lastTouched: number;
-  sdkSessionId: string;
+  threadId: string;
   turnCount: number;
   lastReply?: string;
 }
@@ -19,42 +22,42 @@ const SESSION_TTL_MS = 60 * 60 * 1000;
 
 const FALLBACK_HU = 'Bocsánat, nem hallottam jól. Mondanád újra?';
 
-async function purge(sessionId: string, sdkSessionId: string): Promise<void> {
+const checkpointer = new MemorySaver();
+let chatModel: ChatAnthropic | null = null;
+
+function getChatModel(): ChatAnthropic {
+  if (!chatModel) {
+    chatModel = new ChatAnthropic({
+      model: config.anthropic.model,
+      apiKey: config.anthropic.apiKey,
+      streaming: true,
+    });
+  }
+  return chatModel;
+}
+
+function dropThread(threadId: string): void {
+  const store = (checkpointer as unknown as { storage?: Map<string, unknown> }).storage;
+  if (store instanceof Map) {
+    store.delete(threadId);
+  }
+}
+
+function purge(sessionId: string, threadId: string): void {
   sessions.delete(sessionId);
   dropEvalLog(sessionId);
   dropAskedQuestions(sessionId);
   void rotateSessionTrace(sessionId);
-  try {
-    await deleteSession(sdkSessionId);
-  } catch (e) {
-    logger.warn(`[tutor-agent] deleteSession failed for ${sdkSessionId}: ${e}`);
-  }
+  dropThread(threadId);
 }
 
 function sweep(): void {
   const now = Date.now();
   for (const [id, s] of sessions) {
     if (now - s.lastTouched > SESSION_TTL_MS) {
-      void purge(id, s.sdkSessionId);
+      purge(id, s.threadId);
     }
   }
-}
-
-function extractToolResultText(content: unknown): string {
-  if (typeof content === 'string') return content;
-  if (Array.isArray(content)) {
-    return content
-      .map((b) => {
-        if (typeof b === 'string') return b;
-        if (b && typeof b === 'object' && 'text' in b && typeof (b as { text: unknown }).text === 'string') {
-          return (b as { text: string }).text;
-        }
-        return JSON.stringify(b);
-      })
-      .join('\n');
-  }
-  if (content === undefined || content === null) return '';
-  return JSON.stringify(content);
 }
 
 function ensureInit(): void {
@@ -78,6 +81,23 @@ function extractSentences(buffer: string): { sentences: string[]; remainder: str
   return { sentences, remainder: buffer.slice(lastIdx) };
 }
 
+function chunkTextContent(content: unknown): string {
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    let out = '';
+    for (const block of content) {
+      if (typeof block === 'string') {
+        out += block;
+      } else if (block && typeof block === 'object') {
+        const b = block as { type?: string; text?: unknown };
+        if (b.type === 'text' && typeof b.text === 'string') out += b.text;
+      }
+    }
+    return out;
+  }
+  return '';
+}
+
 export interface SentenceEvent {
   idx: number;
   hu: string;
@@ -96,19 +116,24 @@ export async function* runTurnStream(
 
   const state = sessions.get(sessionId) ?? {
     lastTouched: Date.now(),
-    sdkSessionId: randomUUID(),
+    threadId: randomUUID(),
     turnCount: 0,
   };
-  const isFirstTurn = state.turnCount === 0;
 
-  const mcpServer = buildTutorMcpServer(sessionId);
+  const tools = buildTutorTools(sessionId);
+  const agent = createReactAgent({
+    llm: getChatModel(),
+    tools,
+    prompt: ACTIVE_CITIZENSHIP_INTERVIEW_PROMPT,
+    checkpointer,
+  });
 
   let assistantText = '';
   let buffer = '';
   let idx = 0;
   const startedAt = Date.now();
   const toolCalls: ToolCallTrace[] = [];
-  const toolById = new Map<string, ToolCallTrace>();
+  const toolByRunId = new Map<string, ToolCallTrace>();
 
   const pending: SentenceEvent[] = [];
 
@@ -121,52 +146,43 @@ export async function* runTurnStream(
   };
 
   try {
-    const q = query({
-      prompt: userText,
-      options: {
-        model: config.anthropic.model,
-        systemPrompt: ACTIVE_CITIZENSHIP_INTERVIEW_PROMPT,
-        mcpServers: { tutor: mcpServer },
-        allowedTools: TUTOR_TOOL_NAMES,
-        tools: [],
-        permissionMode: 'bypassPermissions',
-        allowDangerouslySkipPermissions: true,
-        settingSources: [],
-        ...(isFirstTurn ? { sessionId: state.sdkSessionId } : { resume: state.sdkSessionId }),
-        env: { ...process.env, ANTHROPIC_API_KEY: config.anthropic.apiKey },
-      },
-    });
+    const stream = agent.streamEvents(
+      { messages: [new HumanMessage(userText)] },
+      { version: 'v2', configurable: { thread_id: state.threadId } },
+    );
 
-    for await (const msg of q) {
-      if (msg.type === 'assistant') {
-        for (const block of msg.message.content) {
-          if (block.type === 'text') {
-            assistantText += block.text;
-            buffer += block.text;
-            flushFromBuffer();
-          } else if (block.type === 'tool_use') {
-            const tc: ToolCallTrace = { name: block.name, input: block.input };
-            toolCalls.push(tc);
-            toolById.set(block.id, tc);
-          }
+    for await (const ev of stream) {
+      if (ev.event === 'on_chat_model_stream') {
+        const chunk = (ev.data as { chunk?: { content?: unknown } }).chunk;
+        const text = chunkTextContent(chunk?.content);
+        if (text) {
+          assistantText += text;
+          buffer += text;
+          flushFromBuffer();
         }
-      } else if (msg.type === 'user') {
-        const content = msg.message.content;
-        if (Array.isArray(content)) {
-          for (const block of content) {
-            if (block && typeof block === 'object' && (block as { type?: string }).type === 'tool_result') {
-              const tr = block as { tool_use_id: string; content: unknown; is_error?: boolean };
-              const tc = toolById.get(tr.tool_use_id);
-              if (tc) {
-                tc.output = extractToolResultText(tr.content);
-                tc.isError = tr.is_error === true;
-              }
-            }
+      } else if (ev.event === 'on_tool_start') {
+        const input = (ev.data as { input?: unknown }).input;
+        const tc: ToolCallTrace = { name: ev.name, input };
+        toolCalls.push(tc);
+        toolByRunId.set(ev.run_id, tc);
+      } else if (ev.event === 'on_tool_end') {
+        const tc = toolByRunId.get(ev.run_id);
+        if (tc) {
+          const output = (ev.data as { output?: unknown }).output;
+          let outStr: string;
+          if (output === undefined || output === null) {
+            outStr = '';
+          } else if (typeof output === 'string') {
+            outStr = output;
+          } else if (typeof output === 'object' && 'content' in (output as object)) {
+            const c = (output as { content?: unknown }).content;
+            outStr = typeof c === 'string' ? c : JSON.stringify(c);
+            const status = (output as { status?: string }).status;
+            if (status === 'error') tc.isError = true;
+          } else {
+            outStr = JSON.stringify(output);
           }
-        }
-      } else if (msg.type === 'result') {
-        if (msg.subtype !== 'success') {
-          logger.warn(`[tutor-agent] non-success result: ${msg.subtype}`);
+          tc.output = outStr;
         }
       }
 
@@ -175,7 +191,7 @@ export async function* runTurnStream(
       }
     }
   } catch (e) {
-    logger.error(`[tutor-agent] query error: ${e}`);
+    logger.error(`[tutor-agent] agent stream error: ${e}`);
     throw e;
   }
 
@@ -221,5 +237,5 @@ export function resetSession(sessionId: string): void {
     dropAskedQuestions(sessionId);
     return;
   }
-  void purge(sessionId, s.sdkSessionId);
+  purge(sessionId, s.threadId);
 }
