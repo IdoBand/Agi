@@ -5,8 +5,8 @@ import { MemorySaver } from '@langchain/langgraph';
 import { HumanMessage } from '@langchain/core/messages';
 import { config } from '../../config/index.js';
 import { logger } from '../../utils/logger.js';
-import { ACTIVE_CITIZENSHIP_INTERVIEW_PROMPT } from './system-prompt.js';
-import { buildTutorTools, dropEvalLog, dropAskedQuestions } from './tutor-tools.js';
+import { ACTIVE_CITIZENSHIP_INTERVIEW_PROMPT, CITIZENSHIP_INTERVIEW_PROMPT_BANK_ONLY } from './system-prompt.js';
+import { buildTutorTools, buildBankOnlyTutorTools, dropEvalLog, dropAskedQuestions, dropBankCursor } from './tutor-tools.js';
 import { ToolCallTrace, TurnTrace } from '../../types/tutor.types.js';
 import { appendTurnTrace, rotateSessionTrace } from './session-trace.js';
 
@@ -15,6 +15,7 @@ interface SessionState {
   threadId: string;
   turnCount: number;
   lastReply?: string;
+  bankOnly: boolean;
 }
 
 const sessions = new Map<string, SessionState>();
@@ -47,6 +48,7 @@ function purge(sessionId: string, threadId: string): void {
   sessions.delete(sessionId);
   dropEvalLog(sessionId);
   dropAskedQuestions(sessionId);
+  dropBankCursor(sessionId);
   void rotateSessionTrace(sessionId);
   dropThread(threadId);
 }
@@ -110,6 +112,7 @@ export interface RunTurnStreamResult {
 export async function* runTurnStream(
   sessionId: string,
   userText: string,
+  bankOnly?: boolean,
 ): AsyncGenerator<SentenceEvent, RunTurnStreamResult, void> {
   ensureInit();
   sweep();
@@ -118,13 +121,15 @@ export async function* runTurnStream(
     lastTouched: Date.now(),
     threadId: randomUUID(),
     turnCount: 0,
+    bankOnly: !!bankOnly,
   };
 
-  const tools = buildTutorTools(sessionId);
+  const tools = state.bankOnly ? buildBankOnlyTutorTools(sessionId) : buildTutorTools(sessionId);
+  const prompt = state.bankOnly ? CITIZENSHIP_INTERVIEW_PROMPT_BANK_ONLY : ACTIVE_CITIZENSHIP_INTERVIEW_PROMPT;
   const agent = createReactAgent({
     llm: getChatModel(),
     tools,
-    prompt: ACTIVE_CITIZENSHIP_INTERVIEW_PROMPT,
+    prompt,
     checkpointer,
   });
 
@@ -235,6 +240,7 @@ export function resetSession(sessionId: string): void {
     void rotateSessionTrace(sessionId);
     dropEvalLog(sessionId);
     dropAskedQuestions(sessionId);
+    dropBankCursor(sessionId);
     return;
   }
   purge(sessionId, s.threadId);

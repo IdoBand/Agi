@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { TutorPhase, TutorTranscriptEntry } from '../types/tutor.types';
+import { ToggleSetting } from './ToggleSetting/ToggleSetting';
 
 interface Props {
   phase: TutorPhase;
   sessionId: string | null;
   transcript: TutorTranscriptEntry[];
   micSelected: boolean;
+  bankOnly: boolean;
+  onBankOnlyChange: (v: boolean) => void;
   onStart: () => void;
   onReset: () => void;
 }
@@ -14,7 +17,7 @@ interface TranslateResponse {
   translatedText: string;
 }
 
-export function TutorControlPanel({ phase, sessionId, transcript, micSelected, onStart, onReset }: Props) {
+export function TutorControlPanel({ phase, sessionId, transcript, micSelected, bankOnly, onBankOnlyChange, onStart, onReset }: Props) {
   const [showHistory, setShowHistory] = useState(true);
   const [englishIdxs, setEnglishIdxs] = useState<Set<number>>(new Set());
   const [translations, setTranslations] = useState<Record<number, string>>({});
@@ -77,6 +80,7 @@ export function TutorControlPanel({ phase, sessionId, transcript, micSelected, o
     return (
       <div className="mt-auto flex flex-col items-center gap-2 w-full">
         {!micSelected && <span className="text-yellow-400 text-sm">Select a microphone first</span>}
+        <ToggleSetting label="Bank-only mode" checked={bankOnly} onChange={onBankOnlyChange} />
         <button
           onClick={onStart}
           disabled={!micSelected}

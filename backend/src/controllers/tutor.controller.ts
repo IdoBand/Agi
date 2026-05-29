@@ -19,6 +19,8 @@ export async function handleTutorTurn(
 ): Promise<void> {
   const audioFile = req.file;
   const sessionId = req.body?.sessionId as string | undefined;
+  const bankOnlyRaw = req.body?.bankOnly as string | undefined;
+  const bankOnly = bankOnlyRaw === 'true';
 
   if (!sessionId) {
     res.status(400).json({ error: 'sessionId is required' });
@@ -72,7 +74,7 @@ export async function handleTutorTurn(
       }
     };
 
-    const stream = runTurnStream(sessionId, trimmed);
+    const stream = runTurnStream(sessionId, trimmed, bankOnly);
     let result: { fullHu: string } = { fullHu: '' };
     while (true) {
       const next = await stream.next();

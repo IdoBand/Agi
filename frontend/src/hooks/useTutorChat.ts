@@ -16,6 +16,8 @@ export interface UseTutorChatReturn {
   isRecording: boolean;
   transcript: TutorTranscriptEntry[];
   sessionId: string | null;
+  bankOnly: boolean;
+  setBankOnly: (v: boolean) => void;
   startSession: () => void;
   resetSession: () => Promise<void>;
   onAssistantAudioEnd: () => void;
@@ -56,6 +58,7 @@ export function useTutorChat(
   onPttAvailableChange?: (v: boolean) => void,
 ): UseTutorChatReturn {
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [bankOnly, setBankOnly] = useState<boolean>(false);
   const [phase, setPhase] = useState<TutorPhase>('idle');
   const [currentMessage, setCurrentMessage] = useState<Message | null>(null);
   const [transcript, setTranscript] = useState<TutorTranscriptEntry[]>([]);
@@ -146,6 +149,7 @@ export function useTutorChat(
         const fd = new FormData();
         fd.append('audio', blob, 'recording.webm');
         fd.append('sessionId', sid);
+        fd.append('bankOnly', String(bankOnly));
         const res = await fetch('/tutor/turn', { method: 'POST', body: fd, signal: controller.signal });
         if (!res.ok) throw new Error(`tutor turn failed: ${res.status}`);
         if (!res.body) throw new Error('no response body');
@@ -224,7 +228,7 @@ export function useTutorChat(
         void assistantText;
       }
     },
-    [enqueueAudio]
+    [enqueueAudio, bankOnly]
   );
 
   useEffect(() => {
@@ -277,6 +281,8 @@ export function useTutorChat(
     isRecording,
     transcript,
     sessionId,
+    bankOnly,
+    setBankOnly,
     startSession,
     resetSession,
     onAssistantAudioEnd,

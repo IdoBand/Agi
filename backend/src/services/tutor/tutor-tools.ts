@@ -3,11 +3,39 @@ import { tool } from '@langchain/core/tools';
 import type { StructuredToolInterface } from '@langchain/core/tools';
 import { listKnowledge, getKnowledgeFile } from './knowledge.service.js';
 import { getAllQuestionMetas } from '../quiz.service.js';
+import { Question } from '../../types/quiz.types.js';
 import { TutorEvalLogEntry } from '../../types/tutor.types.js';
 import { logger } from '../../utils/logger.js';
 
 const evalLogs = new Map<string, TutorEvalLogEntry[]>();
 const askedQuestions = new Map<string, Set<string>>();
+
+interface BankCursor {
+  categories: string[];
+  questionsByCategory: Map<string, Question[]>;
+  categoryIdx: number;
+  questionIdx: number;
+  lastServedId: string | null;
+}
+const bankCursors = new Map<string, BankCursor>();
+
+async function buildBankCursor(): Promise<{ categories: string[]; questionsByCategory: Map<string, Question[]> }> {
+  const all = await getAllQuestionMetas();
+  const categories: string[] = [];
+  const questionsByCategory = new Map<string, Question[]>();
+  for (const q of all) {
+    if (!questionsByCategory.has(q.category)) {
+      categories.push(q.category);
+      questionsByCategory.set(q.category, []);
+    }
+    questionsByCategory.get(q.category)!.push(q);
+  }
+  return { categories, questionsByCategory };
+}
+
+export function dropBankCursor(sessionId: string): void {
+  bankCursors.delete(sessionId);
+}
 
 export function appendEvalLog(sessionId: string, entry: TutorEvalLogEntry): void {
   const list = evalLogs.get(sessionId) ?? [];
@@ -123,4 +151,148 @@ export function buildTutorTools(sessionId: string): StructuredToolInterface[] {
   );
 
   return [listTool, readTool, drawTool, recordTool] as StructuredToolInterface[];
+}
+
+export function buildBankOnlyTutorTools(sessionId: string): StructuredToolInterface[] {
+  const listTool = tool(
+    async () => {
+      try {
+        const entries = await listKnowledge();
+        return JSON.stringify({ entries });
+      } catch (e) {
+        logger.error(`[tutor-tool listKnowledge] ${e}`);
+        throw e;
+      }
+    },
+    {
+      name: 'listKnowledge',
+      description: 'List all curated knowledge files (titles, summaries, tags). Call this once at session start.',
+      schema: z.object({}),
+    },
+  );
+
+  const readTool = tool(
+    async (args: { path: string }) => {
+      try {
+        const content = await getKnowledgeFile(args.path);
+        return JSON.stringify({ content });
+      } catch (e) {
+        logger.error(`[tutor-tool readKnowledge] ${e}`);
+        throw e;
+      }
+    },
+    {
+      name: 'readKnowledge',
+      description: 'Read the full contents of a curated knowledge file by its manifest path.',
+      schema: z.object({ path: z.string().describe('manifest path, e.g. "numbers.md"') }),
+    },
+  );
+
+  const drawNextTool = tool(
+    async (args: { skip: 'none' | 'question' | 'category' }) => {
+      try {
+        let cur = bankCursors.get(sessionId);
+        const firstEver = !cur;
+        if (!cur) {
+          const built = await buildBankCursor();
+          cur = {
+            categories: built.categories,
+            questionsByCategory: built.questionsByCategory,
+            categoryIdx: 0,
+            questionIdx: 0,
+            lastServedId: null,
+          };
+          bankCursors.set(sessionId, cur);
+        }
+
+        const skip = args.skip;
+        let announceNewCategory = firstEver;
+        const startCategoryIdx = cur.categoryIdx;
+
+        if (skip === 'category') {
+          cur.categoryIdx += 1;
+          cur.questionIdx = 0;
+        } else if (skip === 'question') {
+          cur.questionIdx += 1;
+        } else {
+          // skip === 'none': re-call guard — if current slot is what we just served, advance.
+          if (cur.lastServedId !== null) {
+            const catName = cur.categories[cur.categoryIdx];
+            const list = catName ? cur.questionsByCategory.get(catName) ?? [] : [];
+            const peek = list[cur.questionIdx];
+            if (peek && peek.id === cur.lastServedId) {
+              cur.questionIdx += 1;
+            }
+          }
+        }
+
+        // Advance past exhausted categories
+        while (cur.categoryIdx < cur.categories.length) {
+          const catName = cur.categories[cur.categoryIdx];
+          const list = cur.questionsByCategory.get(catName) ?? [];
+          if (cur.questionIdx < list.length) break;
+          cur.categoryIdx += 1;
+          cur.questionIdx = 0;
+        }
+
+        if (cur.categoryIdx !== startCategoryIdx) announceNewCategory = true;
+
+        if (cur.categoryIdx >= cur.categories.length) {
+          cur.lastServedId = null;
+          return JSON.stringify({ done: true });
+        }
+
+        const categoryName = cur.categories[cur.categoryIdx];
+        const list = cur.questionsByCategory.get(categoryName) ?? [];
+        const pick = list[cur.questionIdx];
+        cur.lastServedId = pick.id;
+
+        const asked = askedQuestions.get(sessionId) ?? new Set<string>();
+        asked.add(pick.id);
+        askedQuestions.set(sessionId, asked);
+
+        const payload: Record<string, unknown> = {
+          id: pick.id,
+          question: pick.question,
+          answer: pick.answer,
+          englishTranslation: pick.englishTranslation,
+          category: pick.category,
+        };
+        if (announceNewCategory) {
+          payload.newCategory = true;
+          payload.categoryName = categoryName;
+        }
+        return JSON.stringify(payload);
+      } catch (e) {
+        logger.error(`[tutor-tool drawNextBankQuestion] ${e}`);
+        throw e;
+      }
+    },
+    {
+      name: 'drawNextBankQuestion',
+      description:
+        'Draw the next bank question from the server-managed category-ordered cursor. Categories walked in first-appearance order; questions within each in JSON file order. Pass skip="question" to skip current, skip="category" to jump to next category, skip="none" otherwise. Returns { newCategory:true, categoryName } when entering a new category, or { done:true } when exhausted.',
+      schema: z.object({
+        skip: z.enum(['none', 'question', 'category']).default('none'),
+      }),
+    },
+  );
+
+  const recordTool = tool(
+    async (args: { topic: string; correct: boolean; note: string }) => {
+      appendEvalLog(sessionId, { topic: args.topic, correct: args.correct, note: args.note, at: Date.now() });
+      return JSON.stringify({ ok: true });
+    },
+    {
+      name: 'recordEvaluation',
+      description: "Record an evaluation of the learner's answer for self-tracking. Does not affect the conversation.",
+      schema: z.object({
+        topic: z.string(),
+        correct: z.boolean(),
+        note: z.string(),
+      }),
+    },
+  );
+
+  return [listTool, readTool, drawNextTool, recordTool] as StructuredToolInterface[];
 }

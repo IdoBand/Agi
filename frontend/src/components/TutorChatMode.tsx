@@ -34,6 +34,8 @@ export function TutorChatMode({ recorder, onMessage, onAudioEndRef, onPttAvailab
       sessionId={tutor.sessionId}
       transcript={tutor.transcript}
       micSelected={!!recorder.selectedDeviceId}
+      bankOnly={tutor.bankOnly}
+      onBankOnlyChange={tutor.setBankOnly}
       onStart={tutor.startSession}
       onReset={tutor.resetSession}
     />
