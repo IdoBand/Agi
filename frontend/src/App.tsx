@@ -6,13 +6,14 @@ import { SpeechBubbleVisualizer } from './components/SpeechBubbleVisualizer';
 import { Sidebar } from './components/Sidebar';
 import { useVoiceRecorder } from './hooks/useVoiceRecorder';
 import { Message } from './types/message.types';
+import styles from './App.module.css';
 
 function LoadingOverlay() {
   return (
-    <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-50">
-      <div className="text-center">
-        <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-        <div className="text-white text-xl">Loading avatar...</div>
+    <div className={styles['loading-overlay']}>
+      <div className={styles['loading-content']}>
+        <div className={`${styles['loading-spinner']} animate-spin`} />
+        <div className={styles['loading-text']}>Loading avatar...</div>
       </div>
     </div>
   );
@@ -48,7 +49,7 @@ export default function App() {
   const handleAudioEnd = useCallback(() => audioEndCbRef.current(), []);
 
   return (
-    <div className="w-full h-screen flex bg-black">
+    <div className={styles.app}>
       <Sidebar
         recorder={recorder}
         onMessage={handleMessage}
@@ -56,21 +57,13 @@ export default function App() {
         onPttAvailableChange={setPttAvailable}
       />
 
-      <div className="flex-1 h-full relative bg-black">
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background:
-              'radial-gradient(circle at center, rgba(255,255,255,0) 55%, rgba(255,255,255,0.7) 100%)',
-            zIndex: 0,
-          }}
-        />
+      <div className={styles.stage}>
+        <div className={styles.overlay} />
 
         <Canvas
           shadows
           camera={{ position: [0, 1.0, 1.6], fov: 38 }}
-          className="w-full h-full relative"
-          style={{ zIndex: 1 }}
+          className={styles.canvas}
         >
           <Suspense fallback={null}>
             <SceneContent

@@ -16,7 +16,8 @@
       "Read(//tmp/**)",
       "Bash(node *)",
       "PowerShell(Get-ChildItem -Recurse -File backend/sre -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName }; \"---bin---\"; Get-ChildItem -Recurse backend/bin -ErrorAction SilentlyContinue | Select-Object -First 30 FullName)",
-      "PowerShell(if \\(Test-Path backend/.env\\) { Get-Content backend/.env | Where-Object { $_ -match 'STT_PROVIDER|TUTOR_PROMPT_VARIANT|OLLAMA|MODEL' } } else { \"no .env\" })"
+      "PowerShell(if \\(Test-Path backend/.env\\) { Get-Content backend/.env | Where-Object { $_ -match 'STT_PROVIDER|TUTOR_PROMPT_VARIANT|OLLAMA|MODEL' } } else { \"no .env\" })",
+      "Bash(npm ls *)"
     ]
   }
 }

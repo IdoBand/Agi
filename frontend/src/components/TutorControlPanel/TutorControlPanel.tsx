@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { TutorPhase, TutorTranscriptEntry } from '../types/tutor.types';
-import { ToggleSetting } from './ToggleSetting/ToggleSetting';
-import { BackButton } from './BackButton';
+import { TutorPhase, TutorTranscriptEntry } from '../../types/tutor.types';
+import { ToggleSetting } from '../ToggleSetting/ToggleSetting';
+import { BackButton } from '../BackButton';
 import styles from './TutorControlPanel.module.css';
 
 interface Props {
@@ -81,15 +81,13 @@ export function TutorControlPanel({ phase, sessionId, transcript, micSelected, b
 
   if (!sessionId) {
     return (
-      <div className="mt-auto flex flex-col items-center gap-2 w-full">
-        {!micSelected && <span className="text-yellow-400 text-sm">Select a microphone first</span>}
+      <div className={styles['start-wrap']}>
+        {!micSelected && <span className={styles.warning}>Select a microphone first</span>}
         <ToggleSetting label="Bank-only mode" checked={bankOnly} onChange={onBankOnlyChange} />
         <button
           onClick={onStart}
           disabled={!micSelected}
-          className={`px-8 py-3 rounded-full shadow-lg text-lg font-medium transition-colors ${
-            micSelected ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-          }`}
+          className={styles['start-btn']}
         >
           Start Tutor
         </button>
@@ -98,46 +96,46 @@ export function TutorControlPanel({ phase, sessionId, transcript, micSelected, b
   }
 
   return (
-    <div className="w-full flex flex-col gap-3 flex-1 min-h-0">
-      <div className="flex items-center">
+    <div className={styles.panel}>
+      <div className={styles['header-row']}>
         <BackButton onClick={onBack} />
       </div>
-      <div className="flex items-center text-sm gap-2">
+      <div className={styles.controls}>
         <button
           onClick={() => setShowHistory((v) => !v)}
-          className="text-gray-300 hover:text-white underline"
+          className={styles['link-btn']}
         >
           {showHistory ? 'Hide' : 'Show'} transcript ({transcript.length})
         </button>
-        <div className="flex-1 flex items-center justify-center min-h-[1.5rem]">
+        <div className={styles['status-slot']}>
           {phase === 'thinking' && (
-            <div className="flex items-center gap-3 text-white">
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              <span className="font-medium">Thinking...</span>
+            <div className={styles['status-row']}>
+              <div className={`${styles.spinner} animate-spin`} />
+              <span className={styles.label}>Thinking...</span>
             </div>
           )}
           {phase === 'speaking' && (
-            <div className="flex items-center gap-3 text-white">
-              <div className="flex gap-1">
-                <div className="w-1 h-4 bg-white animate-bounce" style={{ animationDelay: '0ms' }} />
-                <div className="w-1 h-4 bg-white animate-bounce" style={{ animationDelay: '150ms' }} />
-                <div className="w-1 h-4 bg-white animate-bounce" style={{ animationDelay: '300ms' }} />
+            <div className={styles['status-row']}>
+              <div className={styles.bars}>
+                <div className={`${styles.bar} animate-bounce`} />
+                <div className={`${styles.bar} animate-bounce`} />
+                <div className={`${styles.bar} animate-bounce`} />
               </div>
-              <span className="font-medium">Speaking...</span>
+              <span className={styles.label}>Speaking...</span>
             </div>
           )}
         </div>
         <button
           onClick={() => setHideTutor((v) => !v)}
-          className="text-gray-300 hover:text-white underline"
+          className={styles['link-btn']}
         >
           {hideTutor ? 'Show' : 'Hide'} tutor
         </button>
       </div>
 
       {showHistory && (
-        <div ref={transcriptRef} className="scrollbar-milky flex-1 min-h-0 overflow-y-auto bg-white/10 rounded p-2 text-sm text-gray-100 flex flex-col gap-2">
-          {transcript.length === 0 && <div className="text-gray-400 italic">No turns yet.</div>}
+        <div ref={transcriptRef} className={`scrollbar-milky ${styles.transcript}`}>
+          {transcript.length === 0 && <div className={styles.empty}>No turns yet.</div>}
           {transcript.map((m, i) => {
             const isAssistant = m.role === 'assistant';
             const showEn = isAssistant && englishIdxs.has(i);
@@ -147,15 +145,13 @@ export function TutorControlPanel({ phase, sessionId, transcript, micSelected, b
             return (
               <div
                 key={i}
-                className={`px-2 py-1 rounded ${
-                  m.role === 'user' ? 'bg-blue-700/40 text-blue-100' : 'bg-white/15 text-gray-100'
-                }`}
+                className={`${styles.bubble} ${m.role === 'user' ? styles['bubble--user'] : styles['bubble--assistant']}`}
               >
-                <span className="font-bold mr-1">{m.role === 'user' ? 'You:' : 'Tutor:'}</span>
+                <span className={styles.role}>{m.role === 'user' ? 'You:' : 'Tutor:'}</span>
                 {isAssistant && m.text && (
                   <button
                     onClick={() => toggleLang(i, m.text)}
-                    className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 text-gray-200 ml-1 mr-1 align-middle"
+                    className={styles.chip}
                     disabled={loading}
                   >
                     {showEn ? 'HU' : 'EN'}
@@ -163,9 +159,9 @@ export function TutorControlPanel({ phase, sessionId, transcript, micSelected, b
                 )}
                 <span className={isAssistant && hideTutor ? styles.blur : ''}>
                   {showEn && loading && !en ? (
-                    <span className="inline-flex items-center gap-1 align-middle">
-                      <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
-                      <span className="italic text-gray-400">translating...</span>
+                    <span className={styles.translating}>
+                      <span className={`${styles['spinner-inline']} animate-spin`} />
+                      <span className={styles['translating-label']}>translating...</span>
                     </span>
                   ) : (
                     body

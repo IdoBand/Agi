@@ -1,0 +1,10 @@
+.wrap {
+  position: absolute;
+  top: 0.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 45px;
+  height: 36px;
+  pointer-events: none;
+  z-index: 20;
+}

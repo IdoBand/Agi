@@ -1,0 +1,58 @@
+.card {
+  border: 1px solid;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.card--correct {
+  background: var(--color-success-surface);
+  border-color: var(--color-success);
+}
+
+.card--incorrect {
+  background: var(--color-error-surface);
+  border-color: var(--color-error);
+}
+
+.heading {
+  font-weight: 700;
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+  text-align: center;
+}
+
+.heading--correct {
+  color: var(--color-success-text);
+}
+
+.heading--incorrect {
+  color: var(--color-error-text);
+}
+
+.label {
+  color: var(--color-text-faint);
+  font-size: 10px;
+  text-transform: uppercase;
+  margin-bottom: 0.125rem;
+}
+
+.value {
+  color: var(--color-text-tertiary);
+  font-size: 0.875rem;
+}
+
+.value--category {
+  color: var(--color-accent-selected);
+}
+
+.value--muted {
+  color: var(--color-text-muted);
+}
+
+.value--translation {
+  color: var(--color-text-muted);
+  font-style: italic;
+}

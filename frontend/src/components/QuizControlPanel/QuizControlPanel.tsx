@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { QuizPhase } from '../types/quiz.types';
-import { BackButton } from './BackButton';
+import { QuizPhase } from '../../types/quiz.types';
+import { BackButton } from '../BackButton';
+import styles from './QuizControlPanel.module.css';
 
 function EvaluationTimer({ startTime }: { startTime: number }) {
   const [elapsed, setElapsed] = useState(0);
@@ -15,7 +16,7 @@ function EvaluationTimer({ startTime }: { startTime: number }) {
 
   const minutes = Math.floor(elapsed / 60);
   const seconds = elapsed % 60;
-  return <span className="font-mono text-gray-400">{minutes}:{seconds.toString().padStart(2, '0')}</span>;
+  return <span className={styles.timer}>{minutes}:{seconds.toString().padStart(2, '0')}</span>;
 }
 
 interface QuizControlPanelProps {
@@ -67,18 +68,14 @@ export function QuizControlPanel({
   // Idle: standalone centered button, no panel
   if (phase === 'idle') {
     return (
-      <div className="mt-auto flex flex-col items-center gap-2 w-full">
+      <div className={styles['idle-wrap']}>
         {!micSelected && (
-          <span className="text-yellow-400 text-sm">Select a microphone first</span>
+          <span className={styles.warning}>Select a microphone first</span>
         )}
         <button
           onClick={onStartQuiz}
           disabled={!micSelected}
-          className={`px-8 py-3 rounded-full shadow-lg text-lg font-medium transition-colors ${
-            micSelected
-              ? 'bg-blue-600 hover:bg-blue-700 text-white'
-              : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-          }`}
+          className={styles['start-btn']}
         >
           Start Quiz
         </button>
@@ -88,26 +85,26 @@ export function QuizControlPanel({
 
   // All other phases: bottom panel
   return (
-    <div className="mt-auto w-full flex flex-col gap-3">
+    <div className={styles.panel}>
       {/* Header row: back to menu */}
-      <div className="flex items-center">
+      <div className={styles['header-row']}>
         <BackButton onClick={onBack} />
       </div>
 
       {/* Top row: score ratio + text toggle */}
-      <div className="flex items-center justify-between mb-3">
+      <div className={styles['top-row']}>
         {totalQuestions > 0 ? (
-          <span className="text-gray-300 text-sm font-medium">{scoreLabel}</span>
+          <span className={styles.score}>{scoreLabel}</span>
         ) : (
           <div />
         )}
         {showTextToggle && (
-          <label className="flex items-center gap-2 text-gray-400 text-sm cursor-pointer select-none">
+          <label className={styles['toggle-label']}>
             <input
               type="checkbox"
               checked={showQuestionText}
               onChange={(e) => setShowQuestionText(e.target.checked)}
-              className="accent-blue-500"
+              className={styles.checkbox}
             />
             Show question
           </label>
@@ -116,7 +113,7 @@ export function QuizControlPanel({
 
       {/* Question text (conditional) */}
       {showTextToggle && showQuestionText && currentQuestionText && (
-        <div className="text-gray-300 text-sm mb-3 px-1 transition-opacity duration-200">
+        <div className={styles['question-text']}>
           {currentQuestionText}
         </div>
       )}
@@ -124,34 +121,30 @@ export function QuizControlPanel({
       {/* Phase-specific controls with fade */}
       <div key={phase} className="animate-fadeIn">
         {phase === 'loading' && (
-          <div className="flex items-center justify-center gap-3 text-white">
-            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            <span className="font-medium">Loading quiz...</span>
+          <div className={styles['status-row']}>
+            <div className={`${styles.spinner} animate-spin`} />
+            <span className={styles.label}>Loading quiz...</span>
           </div>
         )}
 
         {phase === 'asking' && (
-          <div className="flex items-center justify-center gap-3 text-white">
-            <div className="flex gap-1">
-              <div className="w-1 h-4 bg-white animate-bounce" style={{ animationDelay: '0ms' }} />
-              <div className="w-1 h-4 bg-white animate-bounce" style={{ animationDelay: '150ms' }} />
-              <div className="w-1 h-4 bg-white animate-bounce" style={{ animationDelay: '300ms' }} />
+          <div className={styles['status-row']}>
+            <div className={styles.bars}>
+              <div className={`${styles.bar} animate-bounce`} />
+              <div className={`${styles.bar} animate-bounce`} />
+              <div className={`${styles.bar} animate-bounce`} />
             </div>
-            <span className="font-medium">Question {currentIndex + 1}/{totalQuestions}</span>
+            <span className={styles.label}>Question {currentIndex + 1}/{totalQuestions}</span>
           </div>
         )}
 
         {phase === 'listening' && (
-          <div className="flex flex-col items-center gap-2">
+          <div className={styles['col-center']}>
             {!isRecording && (
               <button
                 onClick={onReplayQuestion}
                 disabled={isAudioPlaying}
-                className={`text-sm px-4 py-1.5 rounded-full transition-colors ${
-                  isAudioPlaying
-                    ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                    : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-                }`}
+                className={styles['pill-btn']}
               >
                 Replay Question
               </button>
@@ -160,63 +153,51 @@ export function QuizControlPanel({
         )}
 
         {phase === 'recorded' && (
-          <div className="flex flex-col items-center gap-2">
+          <div className={styles['col-center']}>
             {!isRecording && (
               <>
                 <button
                   onClick={onSendAnswer}
                   disabled={isAudioPlaying}
-                  className={`px-8 py-2.5 rounded-full font-medium transition-colors ${
-                    isAudioPlaying
-                      ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                      : 'bg-green-600 hover:bg-green-700 text-white'
-                  }`}
+                  className={styles['send-btn']}
                 >
                   Send Answer
                 </button>
-                <div className="flex gap-2">
+                <div className={styles['btn-row']}>
                   <button
                     onClick={onReplayQuestion}
                     disabled={isAudioPlaying}
-                    className={`text-sm px-4 py-1.5 rounded-full transition-colors ${
-                      isAudioPlaying
-                        ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                        : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-                    }`}
+                    className={styles['pill-btn']}
                   >
                     Replay Question
                   </button>
                   <button
                     onClick={onPlayRecordedAnswer}
                     disabled={isAudioPlaying || !hasRecordedAnswer}
-                    className={`text-sm px-4 py-1.5 rounded-full transition-colors ${
-                      isAudioPlaying || !hasRecordedAnswer
-                        ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                        : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-                    }`}
+                    className={styles['pill-btn']}
                   >
                     Play Answer
                   </button>
                 </div>
-                <span className="text-gray-500 text-xs">or hold T to re-record</span>
+                <span className={styles.hint}>or hold T to re-record</span>
               </>
             )}
           </div>
         )}
 
         {phase === 'evaluating' && (
-          <div className="flex items-center justify-center gap-3 text-white">
-            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            <span className="font-medium">Evaluating...</span>
+          <div className={styles['status-row']}>
+            <div className={`${styles.spinner} animate-spin`} />
+            <span className={styles.label}>Evaluating...</span>
             {evaluationStartTime != null && <EvaluationTimer startTime={evaluationStartTime} />}
           </div>
         )}
 
         {phase === 'result' && (
-          <div className="flex flex-col items-center">
+          <div className={styles['result-wrap']}>
             <button
               onClick={onNextQuestion}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-2.5 rounded-full font-medium transition-colors"
+              className={styles['next-btn']}
             >
               {isLastQuestion ? 'Finish' : 'Next Question'}
             </button>
@@ -224,9 +205,9 @@ export function QuizControlPanel({
         )}
 
         {phase === 'finished' && (
-          <div className="text-center">
-            <div className="text-white text-2xl font-bold mb-1">Quiz Complete!</div>
-            <div className="text-gray-300 text-lg">{score}/{totalQuestions}</div>
+          <div className={styles.finished}>
+            <div className={styles['finished-title']}>Quiz Complete!</div>
+            <div className={styles['finished-score']}>{score}/{totalQuestions}</div>
           </div>
         )}
       </div>

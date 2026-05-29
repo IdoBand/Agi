@@ -8,11 +8,35 @@
   --color-text-secondary: #e5e7eb;                   /* gray-200 */
   --color-text-muted: #9ca3af;                       /* gray-400 */
   --color-text-tertiary: #d1d5db;                    /* gray-300, idle menu btn text */
-  --color-text-tertiary: #d1d5db;                    /* gray-300, idle menu btn text */
+  --color-text-faint: #6b7280;                       /* gray-500, field labels / disabled small text */
+  --color-text-bright: #f3f4f6;                      /* gray-100, transcript text */
   --color-surface-menu: #111827;                     /* gray-900, dropdown bg */
   --color-surface-hover: #1f2937;                    /* gray-800, menu hover */
+  --color-surface-disabled: #4b5563;                 /* gray-600, disabled btn bg / muted hover */
   --color-accent-selected: #60a5fa;                  /* blue-400, selected device */
+  --color-accent-checkbox: #3b82f6;                  /* blue-500, checkbox accent */
   --color-recording: #ef4444;                        /* red-500, rec dot */
+  --color-bg-app: #000000;                           /* black, app root */
+
+  /* Status / feedback */
+  --color-warning: #facc15;                          /* yellow-400, hint text */
+  --color-status-pending: #f97316;                   /* orange-500, mic not selected */
+  --color-status-loading: #eab308;                   /* yellow-500, processing */
+  --color-status-speaking: #22c55e;                  /* green-500, speaking */
+  --color-success: #16a34a;                          /* green-600, send / correct */
+  --color-success-hover: #15803d;                    /* green-700 */
+  --color-success-text: #4ade80;                     /* green-400 */
+  --color-success-surface: rgba(22, 163, 74, 0.2);   /* green-600/20 */
+  --color-error: #dc2626;                            /* red-600, incorrect */
+  --color-error-text: #f87171;                       /* red-400 */
+  --color-error-surface: rgba(220, 38, 38, 0.2);     /* red-600/20 */
+
+  /* Translucent surfaces (tutor transcript) */
+  --color-bubble-user: rgba(29, 78, 216, 0.4);       /* blue-700/40, user bubble */
+  --color-bubble-user-text: #dbeafe;                 /* blue-100, user bubble text */
+  --color-bubble-assistant: rgba(255, 255, 255, 0.15); /* white/15, assistant bubble */
+  --color-surface-translucent: rgba(255, 255, 255, 0.1);       /* white/10, panel + chip */
+  --color-surface-translucent-hover: rgba(255, 255, 255, 0.2); /* white/20, chip hover */
 
   /* Gradients */
   --gradient-sidebar: linear-gradient(
@@ -39,3 +63,32 @@
 .scrollbar-milky::-webkit-scrollbar-thumb:hover {
   background-color: rgba(255, 255, 255, 0.35);
 }
+
+/* Global keyframes (reproduce Tailwind defaults) */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(-25%);
+    animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+  }
+  50% {
+    transform: none;
+    animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+@keyframes fadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+/* Global animation utilities */
+.animate-spin { animation: spin 1s linear infinite; }
+.animate-bounce { animation: bounce 1s infinite; }
+.animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+.animate-fadeIn { animation: fadeIn 200ms ease-in; }

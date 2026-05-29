@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
-import { getSharedAnalyser } from '../utils/sharedAnalyser';
-import { lerp } from '../utils/lipsync';
+import { getSharedAnalyser } from '../../utils/sharedAnalyser';
+import { lerp } from '../../utils/lipsync';
+import styles from './SpeechBubbleVisualizer.module.css';
 
 const POINT_COUNT = 48;
 const VIEW_W = 45;
@@ -89,7 +90,7 @@ export function SpeechBubbleVisualizer() {
   }, []);
 
   return (
-    <div className="absolute top-3 left-1/2 -translate-x-1/2 w-[45px] h-[36px] pointer-events-none z-20">
+    <div className={styles.wrap}>
       <svg
         viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
         width={VIEW_W}
