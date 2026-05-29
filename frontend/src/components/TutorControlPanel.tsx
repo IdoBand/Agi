@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { TutorPhase, TutorTranscriptEntry } from '../types/tutor.types';
 import { ToggleSetting } from './ToggleSetting/ToggleSetting';
+import styles from './TutorControlPanel.module.css';
 
 interface Props {
   phase: TutorPhase;
@@ -19,6 +20,7 @@ interface TranslateResponse {
 
 export function TutorControlPanel({ phase, sessionId, transcript, micSelected, bankOnly, onBankOnlyChange, onStart, onReset }: Props) {
   const [showHistory, setShowHistory] = useState(true);
+  const [hideTutor, setHideTutor] = useState(false);
   const [englishIdxs, setEnglishIdxs] = useState<Set<number>>(new Set());
   const [translations, setTranslations] = useState<Record<number, string>>({});
   const [loadingIdxs, setLoadingIdxs] = useState<Set<number>>(new Set());
@@ -121,6 +123,12 @@ export function TutorControlPanel({ phase, sessionId, transcript, micSelected, b
             </div>
           )}
         </div>
+        <button
+          onClick={() => setHideTutor((v) => !v)}
+          className="text-gray-300 hover:text-white underline"
+        >
+          {hideTutor ? 'Show' : 'Hide'} tutor
+        </button>
         <button onClick={onReset} className="text-red-300 hover:text-red-200 underline">
           Reset session
         </button>
@@ -152,14 +160,16 @@ export function TutorControlPanel({ phase, sessionId, transcript, micSelected, b
                     {showEn ? 'HU' : 'EN'}
                   </button>
                 )}
-                {showEn && loading && !en ? (
-                  <span className="inline-flex items-center gap-1 align-middle">
-                    <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
-                    <span className="italic text-gray-400">translating...</span>
-                  </span>
-                ) : (
-                  body
-                )}
+                <span className={isAssistant && hideTutor ? styles.blur : ''}>
+                  {showEn && loading && !en ? (
+                    <span className="inline-flex items-center gap-1 align-middle">
+                      <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
+                      <span className="italic text-gray-400">translating...</span>
+                    </span>
+                  ) : (
+                    body
+                  )}
+                </span>
               </div>
             );
           })}

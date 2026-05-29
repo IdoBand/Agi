@@ -1,0 +1,9 @@
+.blur {
+  filter: blur(6px);
+  transition: filter 150ms ease;
+  cursor: pointer;
+  user-select: none;
+}
+.blur:hover {
+  filter: blur(0);
+}
