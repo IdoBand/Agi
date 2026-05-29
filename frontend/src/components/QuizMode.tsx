@@ -16,10 +16,15 @@ interface Props {
   onMessage: (m: Message | null) => void;
   onAudioEndRef: (cb: () => void) => void;
   onPttAvailableChange: (v: boolean) => void;
+  onActiveChange: (v: boolean) => void;
 }
 
-export function QuizMode({ recorder, onMessage, onAudioEndRef, onPttAvailableChange }: Props) {
+export function QuizMode({ recorder, onMessage, onAudioEndRef, onPttAvailableChange, onActiveChange }: Props) {
   const quiz = useQuiz(recorder, onPttAvailableChange);
+
+  useEffect(() => {
+    onActiveChange(quiz.phase !== 'idle');
+  }, [quiz.phase, onActiveChange]);
 
   useEffect(() => {
     onMessage(quiz.currentMessage);
@@ -56,6 +61,7 @@ export function QuizMode({ recorder, onMessage, onAudioEndRef, onPttAvailableCha
         onNextQuestion={quiz.nextQuestion}
         onReplayQuestion={quiz.replayQuestionAudio}
         onPlayRecordedAnswer={quiz.playRecordedAnswer}
+        onBack={quiz.resetQuiz}
       />
     </>
   );

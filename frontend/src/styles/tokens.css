@@ -7,6 +7,8 @@
   --color-accent-primary-hover: #1d4ed8;             /* blue-700 */
   --color-text-secondary: #e5e7eb;                   /* gray-200 */
   --color-text-muted: #9ca3af;                       /* gray-400 */
+  --color-text-tertiary: #d1d5db;                    /* gray-300, idle menu btn text */
+  --color-text-tertiary: #d1d5db;                    /* gray-300, idle menu btn text */
   --color-surface-menu: #111827;                     /* gray-900, dropdown bg */
   --color-surface-hover: #1f2937;                    /* gray-800, menu hover */
   --color-accent-selected: #60a5fa;                  /* blue-400, selected device */

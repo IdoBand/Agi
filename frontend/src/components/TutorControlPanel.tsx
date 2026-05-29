@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { TutorPhase, TutorTranscriptEntry } from '../types/tutor.types';
 import { ToggleSetting } from './ToggleSetting/ToggleSetting';
+import { BackButton } from './BackButton';
 import styles from './TutorControlPanel.module.css';
 
 interface Props {
@@ -11,14 +12,14 @@ interface Props {
   bankOnly: boolean;
   onBankOnlyChange: (v: boolean) => void;
   onStart: () => void;
-  onReset: () => void;
+  onBack: () => void;
 }
 
 interface TranslateResponse {
   translatedText: string;
 }
 
-export function TutorControlPanel({ phase, sessionId, transcript, micSelected, bankOnly, onBankOnlyChange, onStart, onReset }: Props) {
+export function TutorControlPanel({ phase, sessionId, transcript, micSelected, bankOnly, onBankOnlyChange, onStart, onBack }: Props) {
   const [showHistory, setShowHistory] = useState(true);
   const [hideTutor, setHideTutor] = useState(false);
   const [englishIdxs, setEnglishIdxs] = useState<Set<number>>(new Set());
@@ -98,6 +99,9 @@ export function TutorControlPanel({ phase, sessionId, transcript, micSelected, b
 
   return (
     <div className="w-full flex flex-col gap-3 flex-1 min-h-0">
+      <div className="flex items-center">
+        <BackButton onClick={onBack} />
+      </div>
       <div className="flex items-center text-sm gap-2">
         <button
           onClick={() => setShowHistory((v) => !v)}
@@ -128,9 +132,6 @@ export function TutorControlPanel({ phase, sessionId, transcript, micSelected, b
           className="text-gray-300 hover:text-white underline"
         >
           {hideTutor ? 'Show' : 'Hide'} tutor
-        </button>
-        <button onClick={onReset} className="text-red-300 hover:text-red-200 underline">
-          Reset session
         </button>
       </div>
 

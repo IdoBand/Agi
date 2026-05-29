@@ -3,12 +3,9 @@ import { Suspense, useCallback, useRef, useState } from 'react';
 import { Experience } from './components/Experience';
 import { MediaConsole } from './components/MediaConsole';
 import { SpeechBubbleVisualizer } from './components/SpeechBubbleVisualizer';
-import { QuizMode } from './components/QuizMode';
-import { TutorChatMode } from './components/TutorChatMode';
+import { Sidebar } from './components/Sidebar';
 import { useVoiceRecorder } from './hooks/useVoiceRecorder';
 import { Message } from './types/message.types';
-
-type Mode = 'quiz' | 'tutor';
 
 function LoadingOverlay() {
   return (
@@ -38,7 +35,6 @@ function SceneContent({
 
 export default function App() {
   const [isModelLoaded, setIsModelLoaded] = useState(false);
-  const [mode, setMode] = useState<Mode>('quiz');
   const [currentMessage, setCurrentMessage] = useState<Message | null>(null);
   const [pttAvailable, setPttAvailable] = useState(false);
   const audioEndCbRef = useRef<() => void>(() => {});
@@ -53,43 +49,12 @@ export default function App() {
 
   return (
     <div className="w-full h-screen flex bg-black">
-      <aside className="w-1/4 min-w-[320px] max-w-[480px] h-full border-r border-gray-700 flex flex-col gap-4 p-2 overflow-hidden min-h-0 z-20 bg-gray-900">
-        <div className="flex gap-2">
-          <button
-            onClick={() => setMode('quiz')}
-            className={`flex-1 px-3 py-1.5 rounded text-sm font-medium ${
-              mode === 'quiz' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300'
-            }`}
-          >
-            Quiz
-          </button>
-          <button
-            onClick={() => setMode('tutor')}
-            className={`flex-1 px-3 py-1.5 rounded text-sm font-medium ${
-              mode === 'tutor' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300'
-            }`}
-          >
-            Tutor
-          </button>
-        </div>
-
-        {mode === 'quiz' && (
-          <QuizMode
-            recorder={recorder}
-            onMessage={handleMessage}
-            onAudioEndRef={registerAudioEndCb}
-            onPttAvailableChange={setPttAvailable}
-          />
-        )}
-        {mode === 'tutor' && (
-          <TutorChatMode
-            recorder={recorder}
-            onMessage={handleMessage}
-            onAudioEndRef={registerAudioEndCb}
-            onPttAvailableChange={setPttAvailable}
-          />
-        )}
-      </aside>
+      <Sidebar
+        recorder={recorder}
+        onMessage={handleMessage}
+        onAudioEndRef={registerAudioEndCb}
+        onPttAvailableChange={setPttAvailable}
+      />
 
       <div className="flex-1 h-full relative bg-black">
         <div

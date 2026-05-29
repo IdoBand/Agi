@@ -1,0 +1,20 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  transition: color 0.15s ease;
+}
+
+.btn:hover {
+  color: var(--color-text-primary);
+}
+
+.icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}

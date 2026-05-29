@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { QuizPhase } from '../types/quiz.types';
+import { BackButton } from './BackButton';
 
 function EvaluationTimer({ startTime }: { startTime: number }) {
   const [elapsed, setElapsed] = useState(0);
@@ -33,6 +34,7 @@ interface QuizControlPanelProps {
   onNextQuestion: () => void;
   onReplayQuestion: () => void;
   onPlayRecordedAnswer: () => void;
+  onBack: () => void;
 }
 
 export function QuizControlPanel({
@@ -51,6 +53,7 @@ export function QuizControlPanel({
   onNextQuestion,
   onReplayQuestion,
   onPlayRecordedAnswer,
+  onBack,
 }: QuizControlPanelProps) {
   const [showQuestionText, setShowQuestionText] = useState(false);
   const isLastQuestion = currentIndex >= totalQuestions - 1;
@@ -86,6 +89,11 @@ export function QuizControlPanel({
   // All other phases: bottom panel
   return (
     <div className="mt-auto w-full flex flex-col gap-3">
+      {/* Header row: back to menu */}
+      <div className="flex items-center">
+        <BackButton onClick={onBack} />
+      </div>
+
       {/* Top row: score ratio + text toggle */}
       <div className="flex items-center justify-between mb-3">
         {totalQuestions > 0 ? (

@@ -30,6 +30,7 @@ interface UseQuizReturn {
   onQuestionAudioEnd: () => void;
   replayQuestionAudio: () => void;
   playRecordedAnswer: () => void;
+  resetQuiz: () => void;
 }
 
 export function useQuiz(
@@ -203,6 +204,20 @@ export function useQuiz(
     }
   }, [recordedBlob, questions, currentIndex, stopPlaybackAudio]);
 
+  const resetQuiz = useCallback(() => {
+    stopPlaybackAudio();
+    phaseBeforeReplayRef.current = null;
+    setPhase('idle');
+    setQuestions([]);
+    setCurrentIndex(0);
+    setScore(0);
+    setResult(null);
+    setRecordedBlob(null);
+    setCurrentMessage(null);
+    setIsAudioPlaying(false);
+    setEvaluationStartTime(null);
+  }, [stopPlaybackAudio]);
+
   const nextQuestion = useCallback(() => {
     const nextIdx = currentIndex + 1;
     setResult(null);
@@ -238,5 +253,6 @@ export function useQuiz(
     onQuestionAudioEnd,
     replayQuestionAudio,
     playRecordedAnswer,
+    resetQuiz,
   };
 }

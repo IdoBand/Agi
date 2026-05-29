@@ -15,10 +15,15 @@ interface Props {
   onMessage: (m: Message | null) => void;
   onAudioEndRef: (cb: () => void) => void;
   onPttAvailableChange: (v: boolean) => void;
+  onActiveChange: (v: boolean) => void;
 }
 
-export function TutorChatMode({ recorder, onMessage, onAudioEndRef, onPttAvailableChange }: Props) {
+export function TutorMode({ recorder, onMessage, onAudioEndRef, onPttAvailableChange, onActiveChange }: Props) {
   const tutor = useTutorChat(recorder, true, onPttAvailableChange);
+
+  useEffect(() => {
+    onActiveChange(tutor.sessionId !== null);
+  }, [tutor.sessionId, onActiveChange]);
 
   useEffect(() => {
     onMessage(tutor.currentMessage);
@@ -37,7 +42,7 @@ export function TutorChatMode({ recorder, onMessage, onAudioEndRef, onPttAvailab
       bankOnly={tutor.bankOnly}
       onBankOnlyChange={tutor.setBankOnly}
       onStart={tutor.startSession}
-      onReset={tutor.resetSession}
+      onBack={tutor.resetSession}
     />
   );
 }
