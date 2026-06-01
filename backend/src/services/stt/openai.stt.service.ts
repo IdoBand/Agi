@@ -15,6 +15,7 @@ export class OpenAISTTService implements ISTTService {
   }
 
   async transcribe(audioPath: string, ctx?: WorkflowContext, prompt?: string): Promise<string> {
+    const startedAt = Date.now();
     try {
       const transcription = await this.openai.audio.transcriptions.create({
         file: fs.createReadStream(audioPath),
@@ -32,6 +33,7 @@ export class OpenAISTTService implements ISTTService {
       }
 
       logger.info(`OPENAI STT RESULT: ${result}`);
+      logger.debug(`[stt-openai] ok latencyMs=${Date.now() - startedAt} chars=${result.length}`);
       return result;
     } catch (error) {
       logger.error(`OpenAI transcription error: ${error}`);

@@ -37,6 +37,7 @@ class GoogleTranslateService implements ITranslationService {
     if (req.sourceLang) body.source = req.sourceLang;
 
     const url = `${this.endpoint}?key=${this.apiKey}`;
+    const startedAt = Date.now();
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -54,6 +55,9 @@ class GoogleTranslateService implements ITranslationService {
     if (!t) {
       throw new Error('Google Translate returned no translations');
     }
+    logger.debug(
+      `[translate] ok target=${req.targetLang} detected=${t.detectedSourceLanguage ?? req.sourceLang ?? '-'} latencyMs=${Date.now() - startedAt}`,
+    );
     return {
       translatedText: t.translatedText,
       detectedSourceLang: t.detectedSourceLanguage,

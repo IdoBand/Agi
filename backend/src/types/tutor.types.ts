@@ -1,3 +1,5 @@
+import type { TurnLlmUsage } from './anthropic.types.js';
+
 export interface KnowledgeEntry {
   path: string;
   title: string;
@@ -30,10 +32,12 @@ export interface ToolCallTrace {
 }
 
 export interface TurnTrace {
+  turnIndex: number;
   userText: string;
   replyText: string;
   replyEn?: string;
   toolCalls: ToolCallTrace[];
   startedAt: number;
   durationMs: number;
+  llmUsage?: TurnLlmUsage;
 }

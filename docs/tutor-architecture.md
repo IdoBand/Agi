@@ -28,7 +28,7 @@ tutor/
 │   ├── controllers/tutor.controller.ts ► STT → runTurnStream → fan-out TTS → SSE
 │   ├── services/tutor/
 │   │   ├── claude-agent.service.ts ───► runTurnStream (Claude SDK + MCP), session map, sweep
-│   │   ├── tutor-tools.ts ────────────► MCP server: list/read/draw/recordEvaluation
+│   │   ├── tutor-tools.ts ────────────► LangChain tools: list/read + fused evaluate-and-draw
 │   │   ├── system-prompt.ts ──────────► baseline + bilingual examiner prompts
 │   │   ├── stt-prompt.ts ─────────────► seeds Whisper w/ scene + last examiner reply
 │   │   ├── knowledge.service.ts ──────► manifest + path-traversal-safe file read
@@ -123,18 +123,25 @@ T-up   ──────────────► stopRecording() → blob
 
 ---
 
-## 5. MCP tools
+## 5. Tools
 
-Built per-session in `tutor-tools.ts:45`. Whitelisted by name in `claude-agent.service.ts:130` via `TUTOR_TOOL_NAMES`. All tools return `{content:[{type:'text', text:JSON.stringify(...)}]}`; errors set `isError:true`.
+Built per-session in `tutor-tools.ts` (closures capture `sessionId`). LangChain `StructuredToolInterface[]` handed to `createReactAgent`. Each tool returns a JSON string. Two builders, one per mode:
+
+- `buildBankOnlyTutorTools` → `listKnowledge`, `readKnowledge`, **`evaluateAndDrawNext`**.
+- `buildTutorTools` (bilingual/active) → `listKnowledge`, `readKnowledge`, **`evaluateAndDrawPractice`**.
 
 | Tool | Input schema | Effect | Storage |
 |------|--------------|--------|---------|
 | `listKnowledge` | `{}` | reads cached manifest | none |
 | `readKnowledge` | `{path: string}` | reads file under `TUTOR_KNOWLEDGE_DIR` (path-traversal blocked) | none |
-| `drawPracticeQuestion` | `{category?: string}` | returns random Q&A from `quiz.service.getAllQuestionMetas()`, minus IDs already served this session; errors when pool empty | mutates `askedQuestions: Map<sid, Set<id>>` |
-| `recordEvaluation` | `{topic: string, correct: boolean, note: string}` | append `{...,at:Date.now()}` | mutates `evalLogs: Map<sid, TutorEvalLogEntry[]>` |
+| `evaluateAndDrawPractice` | `{ evaluation?: {topic,correct,note}, draw?: {category?} }` | **fused**: if `evaluation`, append eval log first; if `draw`, return random Q&A minus served IDs. Both optional. Returns `{recorded, ...question}` or `{recorded}` | mutates `evalLogs` + `askedQuestions` |
+| `evaluateAndDrawNext` | `{ evaluation?: {topic,correct,note}, draw?: {skip:'none'\|'question'\|'category'} }` | **fused**: eval-log first (if present), then advance the server cursor (if `draw`). Eval-only call leaves cursor untouched. Returns `{recorded, ...question}`, `{recorded, newCategory, categoryName}`, `{recorded, done:true}`, or `{recorded}` | mutates `evalLogs` + `askedQuestions` + `bankCursors` |
 
-The MCP server is rebuilt on every turn (closure captures `sessionId`). Maps are module-scoped in `tutor-tools.ts`; cleared by `dropEvalLog` / `dropAskedQuestions` from `purge`.
+Fusion eliminates the separate `recordEvaluation` round-trip: a record+draw turn is one tool call (one observe round-trip) instead of two. Maps are module-scoped in `tutor-tools.ts`; cleared by `dropEvalLog` / `dropAskedQuestions` / `dropBankCursor` from `purge`.
+
+### Prompt caching
+
+The static prefix (tool schemas + system prompt) is byte-identical across every turn. `claude-agent.service.ts` builds two module-level `SystemMessage`s whose single text block carries `cache_control:{type:'ephemeral'}`; Anthropic caches the whole tools→system prefix. First Sonnet call of a session writes the cache (~3.6k tokens), every later call reads it. Observable via `cacheRead=`/`cacheWrite=` on the `llm_call_end` debug line. Note: `input_tokens` already folds in cache tokens, so it does not drop — judge caching by the cache fields, not `inTokens`.
 
 ---
 
@@ -160,8 +167,8 @@ The MCP server is rebuilt on every turn (closure captures `sessionId`). Maps are
 │     evalLogs       : Map<sid, TutorEvalLogEntry[]> (tutor-tools)    │
 │     turnCounters   : Map<sid, number>          (session-trace)      │
 │     headerWritten  : Set<sid>                  (session-trace)      │
-│     write: runTurnStream end-of-turn / drawPracticeQuestion /       │
-│            recordEvaluation                                          │
+│     write: runTurnStream end-of-turn / evaluateAndDraw{Next,        │
+│            Practice} (eval log + asked set + bank cursor)           │
 │     drop:  purge() + sweep() (every turn, evicts >1 h idle)         │
 └─────────────────────────────────────────────────────────────────────┘
               ▲
@@ -199,17 +206,19 @@ Both share the same skeleton (only the *grammar feedback* section differs):
 - **Persona** — Hungarian citizenship interview examiner; neutral, professional; default Hungarian; no rapport-building.
 - **Language level (own speech)** — A2 CEFR; short sentences; present + simple past; ~1500 words; no idioms/slang/conditional/subjunctive; cap does not apply to bank questions read verbatim.
 - **Session continuity** — full history (incl. tool calls + results) is resumed each turn; treat as ground truth; no re-asking; max 3 redraws if a paraphrase appears.
-- **Conduct (drill loop, MANDATORY)** —
-  1. Previous turn was a drill + learner answered → first action this turn is `recordEvaluation`.
-  2. Never two `drawPracticeQuestion`s without a `recordEvaluation` between.
-  3. Clarification turns ("nem értem", translation request) defer recording.
+- **Conduct (tool use, MANDATORY)** — re-expressed in fused terms (the old two-step "record then draw" is now one call):
+  - **eval + draw** (both args): normal turn after the learner answered — record and draw the next in one call.
+  - **draw only**: first question; redundancy re-draw (`skip:'question'`/cap 3, or cap-3 redraw in bilingual).
+  - **eval only**: deferred-eval resolution; recording a self-generated (non-bank) question; "correct" + own follow-up.
+  - **no tool call**: first miss/partial (hint, defer eval, await retry); pure clarification turn.
+  - Hard invariant: if the previous turn drew a question and the learner attempted an answer, this turn's call MUST include `evaluation` (except deferred-partial-awaiting-retry, clarification, or skip with `note='skipped'`). Never attach `evaluation` to a silent re-draw.
   - One question at a time; brief acknowledgement; first turn = greeting + first question.
 - **Evaluation** — charitable to STT noise; gold answer is one valid answer; partial OK; `correct=false` only on real meaning miss; neutral verbalization (`Helyes.` / `Pontosabban: …`).
 - **Grammar feedback** —
   - *baseline:* repeat corrected form in Hungarian, e.g. `Helyesen: a nagymamám családja.`
   - *bilingual:* deliver correction in **English** (`Quick correction — you said '<wrong>', the correct form is '<right>' because <reason>.`), then continue in Hungarian.
-  - One per turn; never on STT noise; doesn't flip pass/fail; surface in `recordEvaluation.note`.
-- **Tools recap** — `drawPracticeQuestion` (don't speak gold first), `listKnowledge`/`readKnowledge` (summarize, don't dump), `recordEvaluation` (mandatory after every drill answer).
+  - One per turn; never on STT noise; doesn't flip pass/fail; surface in the fused tool's `evaluation.note`.
+- **Tools recap** — `evaluateAndDrawPractice`/`evaluateAndDrawNext` (fused: `draw` pulls a question — don't speak gold first; `evaluation` records the judgement — mandatory after every drill answer; combine both in one call), `listKnowledge`/`readKnowledge` (summarize, don't dump).
 - **Output format** — Hungarian only (bilingual exception: the correction sentence is English); plain text; no markdown/JSON/tags.
 - **Hard rules** — short (1-3 sentences); spoken aloud; never break character; never expose tool names; never empty.
 ---
@@ -277,7 +286,7 @@ Both JSON files are arrays of question metas with the schema (per `quiz.service.
 ```
 { id, category, question, answer, englishTranslation, ... }
 ```
-`drawPracticeQuestion` reads from this aggregated bank (not from the knowledge files directly via MCP — the knowledge tools are for grammar/vocab lookup).
+The fused draw tools (`evaluateAndDrawPractice` / `evaluateAndDrawNext`) read from this aggregated bank (not from the knowledge files directly — the knowledge tools are for grammar/vocab lookup).
 
 ---
 

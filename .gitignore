@@ -92,3 +92,6 @@ coverage/
 
 # Backend logs (all subdirs)
 backend/logs/**
+
+# Claude local settings (machine-specific permissions)
+.claude/settings.local.json

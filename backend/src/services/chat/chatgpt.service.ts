@@ -36,7 +36,9 @@ export class ChatGPTService implements ILLMService {
       ];
 
       logger.debug(`Sending ${messages.length} messages to ChatGPT`);
+      const startedAt = Date.now();
       const response = await this.model.invoke(langchainMessages);
+      logger.debug(`[chatgpt] chat ok latencyMs=${Date.now() - startedAt}`);
 
       const content = typeof response.content === 'string'
         ? response.content
@@ -69,7 +71,9 @@ export class ChatGPTService implements ILLMService {
       });
 
       logger.debug(`Sending ${messages.length} messages to ChatGPT (structured)`);
+      const startedAt = Date.now();
       const result = await agent.invoke({ messages: formattedMessages });
+      logger.debug(`[chatgpt] chatWithSchema ok latencyMs=${Date.now() - startedAt}`);
 
       return (result as unknown as { structuredResponse: z.infer<T> }).structuredResponse;
     } catch (error) {

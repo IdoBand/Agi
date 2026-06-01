@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { uploadAudio } from './middleware/upload.middleware.js';
 import { errorHandler } from './middleware/error.middleware.js';
+import { requestLogger } from './middleware/request-logger.middleware.js';
 import { handleVoiceChat, handleTextChat, clearHistory } from './controllers/chat.controller.js';
 import { ensureDir } from './utils/file.utils.js';
 import { config } from './config/index.js';
@@ -19,6 +20,7 @@ export async function createApp(): Promise<express.Application> {
   // Middleware
   app.use(cors());
   app.use(express.json());
+  app.use(requestLogger);
 
   // Static files for audio
   app.use('/audios', express.static(config.paths.audios));

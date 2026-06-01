@@ -5,8 +5,11 @@ import { logger } from '../../utils/logger.js';
 import { ToolCallTrace, TurnTrace } from '../../types/tutor.types.js';
 
 const TRACE_DIR = path.resolve('logs/tutor-sessions');
-const turnCounters = new Map<string, number>();
 const headerWritten = new Set<string>();
+
+function formatNum(n: number): string {
+  return n.toLocaleString('en-US');
+}
 
 function filePath(sessionId: string): string {
   return path.join(TRACE_DIR, `${sessionId}.md`);
@@ -28,11 +31,17 @@ function formatTool(tc: ToolCallTrace): string {
   return `- \`${tc.name}\` (${truncate(args, 300)}) →${status} ${out}`;
 }
 
-function renderTurn(n: number, t: TurnTrace): string {
+function renderTurn(t: TurnTrace): string {
   const ts = new Date(t.startedAt).toISOString();
   const lines: string[] = [];
-  lines.push(`## Turn ${n} — ${ts} (${t.durationMs}ms)`);
+  lines.push(`## Turn ${t.turnIndex} — ${ts} (${t.durationMs}ms)`);
   lines.push(`**Learner:** ${t.userText}`);
+  if (t.llmUsage) {
+    const u = t.llmUsage;
+    lines.push(
+      `**LLM:** ${u.sonnetCalls} Sonnet call${u.sonnetCalls === 1 ? '' : 's'} · ${formatNum(u.inputTokens)} in / ${formatNum(u.outputTokens)} out tokens`,
+    );
+  }
   if (t.toolCalls.length > 0) {
     lines.push('**Tools:**');
     for (const tc of t.toolCalls) lines.push(formatTool(tc));
@@ -61,9 +70,7 @@ export async function appendTurnTrace(sessionId: string, trace: TurnTrace): Prom
   try {
     await ensureDir();
     await writeHeaderIfNeeded(sessionId);
-    const n = (turnCounters.get(sessionId) ?? 0) + 1;
-    turnCounters.set(sessionId, n);
-    await fs.appendFile(filePath(sessionId), renderTurn(n, trace), 'utf8');
+    await fs.appendFile(filePath(sessionId), renderTurn(trace), 'utf8');
   } catch (e) {
     logger.warn(`[tutor-trace] append failed: ${e}`);
   }
@@ -75,7 +82,6 @@ export async function rotateSessionTrace(sessionId: string): Promise<void> {
     try {
       await fs.access(fp);
     } catch {
-      turnCounters.delete(sessionId);
       headerWritten.delete(sessionId);
       return;
     }
@@ -86,7 +92,6 @@ export async function rotateSessionTrace(sessionId: string): Promise<void> {
   } catch (e) {
     logger.warn(`[tutor-trace] rotate failed: ${e}`);
   } finally {
-    turnCounters.delete(sessionId);
     headerWritten.delete(sessionId);
   }
 }

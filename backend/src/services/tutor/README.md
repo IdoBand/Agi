@@ -8,7 +8,7 @@ share the same STT / TTS / lipsync / avatar pipeline.
 
 - `claude-agent.service.ts` — agent runner (one `query()` per turn, history
   fallback, session map)
-- `tutor-tools.ts` — 4 custom tools, registered as in-process MCP server
+- `tutor-tools.ts` — custom LangChain tools (list/read + one fused evaluate-and-draw per mode)
 - `system-prompt.ts` — persona + tool-use rules
 - `knowledge.service.ts` — manifest loader, path-traversal guard
 - `../../../knowledge/manifest.json` + `*.md` — curated lessons
@@ -47,7 +47,7 @@ mic Blob ─► POST /tutor/turn ─► uploadAudio (multer writes temp/<wf>/inp
   tutor that's fine.
 - **`tools: []`** disables the built-in Claude Code tools (Read, Bash,
   Grep…). Without this the agent could read your filesystem.
-- **`allowedTools`** whitelists only the 4 MCP tools, so even if defaults
+- **`allowedTools`** whitelists only the tutor tools, so even if defaults
   sneak through they're rejected.
 - **`permissionMode: 'bypassPermissions'`** — the agent runs unattended; we
   don't want a CLI permission prompt blocking the request.
@@ -61,14 +61,14 @@ auto-generates the JSON schema from Zod and routes tool calls back to your
 handler. The agent sees them as `mcp__tutor__listKnowledge`, etc.
 (`mcp__<server>__<tool>`).
 
-The 4 we registered:
+The tools per mode (the draw + record tools are **fused** into one — recording rides along with the draw instead of taking its own Sonnet round-trip):
 
-| Tool | Purpose |
-|---|---|
-| `listKnowledge` | reads `manifest.json`, returns `{entries:[{path,title,summary,tags}]}` — the agent's "table of contents" |
-| `readKnowledge({path})` | path must be in manifest; resolves under `knowledgeDir` and asserts the resolved path stays inside (defeats `../`) |
-| `drawPracticeQuestion({category?})` | calls **`getRandomQuestionMeta`** (the new lightweight variant we added to `quiz.service.ts` — no audio loading) |
-| `recordEvaluation({topic,correct,note})` | appends to a per-session log Map — Claude self-tracks how the learner did |
+| Tool | Mode | Purpose |
+|---|---|---|
+| `listKnowledge` | both | reads `manifest.json`, returns `{entries:[{path,title,summary,tags}]}` — the agent's "table of contents" |
+| `readKnowledge({path})` | both | path must be in manifest; resolves under `knowledgeDir` and asserts the resolved path stays inside (defeats `../`) |
+| `evaluateAndDrawPractice({evaluation?,draw?})` | bilingual/active | **fused**: optional `evaluation {topic,correct,note}` appends to the per-session eval log; optional `draw {category?}` returns a random Q&A minus served IDs. Both optional → first question is draw-only, a correct answer is eval+draw in one call, an eval-only call records without drawing |
+| `evaluateAndDrawNext({evaluation?,draw?})` | bank-only | **fused**: same `evaluation`; `draw {skip:'none'\|'question'\|'category'}` advances the server-managed category cursor. Eval-only call leaves the cursor untouched |
 
 ## Adding a new tool
 
@@ -152,5 +152,5 @@ first turn if it's missing rather than silently degrading.
 - **Empty-reply fallback.** If the model only emits tool calls with no final
   text, we return `"Bocsánat, nem hallottam jól. Mondanád újra?"` so
   ElevenLabs doesn't reject an empty input.
-- **Eval logs are write-only.** `recordEvaluation` appends; nothing reads
+- **Eval logs are write-only.** the fused tool's `evaluation` arg appends; nothing reads
   them yet. Add a `summarizeProgress` tool or end-of-session recap when ready.

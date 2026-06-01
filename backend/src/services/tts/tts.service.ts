@@ -18,6 +18,7 @@ class TTSService implements ITTSService {
   async synthesize(text: string): Promise<Buffer> {
     try {
       logger.debug(`Synthesizing text: ${text.substring(0, 50)}...`);
+      const startedAt = Date.now();
 
       const audioStream = await this.elevenLabs.textToSpeech.convert(
         config.elevenLabs.voiceId,
@@ -33,7 +34,7 @@ class TTSService implements ITTSService {
       }
 
       const audioBuffer = Buffer.concat(chunks);
-      logger.debug(`Generated audio: ${audioBuffer.length} bytes`);
+      logger.debug(`Generated audio: ${audioBuffer.length} bytes latencyMs=${Date.now() - startedAt}`);
 
       return audioBuffer;
     } catch (error) {

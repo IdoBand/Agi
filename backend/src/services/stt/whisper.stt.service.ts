@@ -84,6 +84,7 @@ export class WhisperSTTService implements ISTTService {
   }
 
   async transcribe(audioPath: string, ctx?: WorkflowContext, prompt?: string): Promise<string> {
+    const startedAt = Date.now();
     try {
       const wavPath = await this.convertToWav(audioPath, ctx);
 
@@ -122,6 +123,7 @@ export class WhisperSTTService implements ISTTService {
       }
 
       logger.info(`WHISPER STT RESULT: ${result}`);
+      logger.debug(`[stt-whisper] ok latencyMs=${Date.now() - startedAt} chars=${result.length}`);
       return result;
     } catch (error) {
       logger.error(`Transcription error: ${error}`);

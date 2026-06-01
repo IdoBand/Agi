@@ -64,6 +64,15 @@ function shuffle<T>(arr: T[]): T[] {
   return copy;
 }
 
+// Shared evaluation shape, embedded as the optional `evaluation` arg of the
+// fused tools. `note` stays required WITHIN the optional object so the eval log
+// never records an undefined note.
+const evaluationSchema = z.object({
+  topic: z.string(),
+  correct: z.boolean(),
+  note: z.string(),
+});
+
 export function buildTutorTools(sessionId: string): StructuredToolInterface[] {
   const listTool = tool(
     async () => {
@@ -99,23 +108,45 @@ export function buildTutorTools(sessionId: string): StructuredToolInterface[] {
     },
   );
 
-  const drawTool = tool(
-    async (args: { category?: string }) => {
+  const evaluateAndDrawPracticeSchema = z.object({
+    evaluation: evaluationSchema
+      .optional()
+      .describe("your evaluation of the learner's pending answer; omit when nothing to record"),
+    draw: z
+      .object({ category: z.string().optional().describe('optional category filter') })
+      .optional()
+      .describe('draw the next practice question; omit for an eval-only call'),
+  });
+  type EvaluateAndDrawPracticeArgs = z.infer<typeof evaluateAndDrawPracticeSchema>;
+
+  const evaluateAndDrawTool = tool(
+    async (args: EvaluateAndDrawPracticeArgs) => {
       try {
+        // (i) Record FIRST so the eval logs the just-answered question.
+        if (args.evaluation) {
+          const { topic, correct, note } = args.evaluation;
+          appendEvalLog(sessionId, { topic, correct, note, at: Date.now() });
+        }
+        // (ii) Eval-only call: do not draw, do not mutate the asked set.
+        if (!args.draw) {
+          return JSON.stringify({ recorded: !!args.evaluation });
+        }
+        const category = args.draw.category;
         const all = await getAllQuestionMetas();
         const asked = askedQuestions.get(sessionId) ?? new Set<string>();
-        const byCategory = args.category
-          ? all.filter((q) => q.category.toLowerCase() === args.category!.toLowerCase())
+        const byCategory = category
+          ? all.filter((q) => q.category.toLowerCase() === category.toLowerCase())
           : all;
         const fresh = byCategory.filter((q) => !asked.has(q.id));
         const pool = fresh.length ? fresh : [];
         if (!pool.length) {
-          throw new Error(args.category ? `no more questions in category "${args.category}"` : 'no more questions available');
+          throw new Error(category ? `no more questions in category "${category}"` : 'no more questions available');
         }
         const pick = shuffle(pool)[0];
         asked.add(pick.id);
         askedQuestions.set(sessionId, asked);
         return JSON.stringify({
+          recorded: !!args.evaluation,
           id: pick.id,
           question: pick.question,
           answer: pick.answer,
@@ -123,34 +154,19 @@ export function buildTutorTools(sessionId: string): StructuredToolInterface[] {
           category: pick.category,
         });
       } catch (e) {
-        logger.error(`[tutor-tool drawPracticeQuestion] ${e}`);
+        logger.error(`[tutor-tool evaluateAndDrawPractice] ${e}`);
         throw e;
       }
     },
     {
-      name: 'drawPracticeQuestion',
-      description: 'Draw a random practice question (Hungarian Q&A pair) from the question bank. Server filters out IDs already served this session.',
-      schema: z.object({ category: z.string().optional().describe('optional category filter') }),
+      name: 'evaluateAndDrawPractice',
+      description:
+        "Fused tool: optionally record an evaluation of the learner's pending answer AND/OR draw a random practice question — in one call. When the learner has answered, pass BOTH `evaluation` and `draw` together. Pass only `evaluation` to record without drawing (e.g. self-generated interview question, or a deferred-eval resolution). Pass only `draw` to draw without recording (first question, redundant re-draw). Drawing filters out IDs already served this session. Response includes the gold answer; do not speak it until the learner has tried.",
+      schema: evaluateAndDrawPracticeSchema,
     },
   );
 
-  const recordTool = tool(
-    async (args: { topic: string; correct: boolean; note: string }) => {
-      appendEvalLog(sessionId, { topic: args.topic, correct: args.correct, note: args.note, at: Date.now() });
-      return JSON.stringify({ ok: true });
-    },
-    {
-      name: 'recordEvaluation',
-      description: "Record an evaluation of the learner's answer for self-tracking. Does not affect the conversation.",
-      schema: z.object({
-        topic: z.string(),
-        correct: z.boolean(),
-        note: z.string(),
-      }),
-    },
-  );
-
-  return [listTool, readTool, drawTool, recordTool] as StructuredToolInterface[];
+  return [listTool, readTool, evaluateAndDrawTool] as StructuredToolInterface[];
 }
 
 export function buildBankOnlyTutorTools(sessionId: string): StructuredToolInterface[] {
@@ -188,9 +204,33 @@ export function buildBankOnlyTutorTools(sessionId: string): StructuredToolInterf
     },
   );
 
-  const drawNextTool = tool(
-    async (args: { skip: 'none' | 'question' | 'category' }) => {
+  const evaluateAndDrawNextSchema = z.object({
+    evaluation: evaluationSchema
+      .optional()
+      .describe("your evaluation of the learner's pending answer; omit when nothing to record"),
+    draw: z
+      .object({
+        skip: z.enum(['none', 'question', 'category']).default('none'),
+      })
+      .optional()
+      .describe('draw the next bank question; omit for an eval-only call'),
+  });
+  type EvaluateAndDrawNextArgs = z.infer<typeof evaluateAndDrawNextSchema>;
+
+  const evaluateAndDrawNextTool = tool(
+    async (args: EvaluateAndDrawNextArgs) => {
       try {
+        // (i) Record FIRST so the eval logs the just-answered/skipped question.
+        const recorded = !!args.evaluation;
+        if (args.evaluation) {
+          const { topic, correct, note } = args.evaluation;
+          appendEvalLog(sessionId, { topic, correct, note, at: Date.now() });
+        }
+        // (ii) Eval-only call: leave the cursor (lastServedId) untouched.
+        if (!args.draw) {
+          return JSON.stringify({ recorded });
+        }
+
         let cur = bankCursors.get(sessionId);
         const firstEver = !cur;
         if (!cur) {
@@ -205,7 +245,7 @@ export function buildBankOnlyTutorTools(sessionId: string): StructuredToolInterf
           bankCursors.set(sessionId, cur);
         }
 
-        const skip = args.skip;
+        const skip = args.draw.skip;
         let announceNewCategory = firstEver;
         const startCategoryIdx = cur.categoryIdx;
 
@@ -239,7 +279,7 @@ export function buildBankOnlyTutorTools(sessionId: string): StructuredToolInterf
 
         if (cur.categoryIdx >= cur.categories.length) {
           cur.lastServedId = null;
-          return JSON.stringify({ done: true });
+          return JSON.stringify({ recorded, done: true });
         }
 
         const categoryName = cur.categories[cur.categoryIdx];
@@ -252,6 +292,7 @@ export function buildBankOnlyTutorTools(sessionId: string): StructuredToolInterf
         askedQuestions.set(sessionId, asked);
 
         const payload: Record<string, unknown> = {
+          recorded,
           id: pick.id,
           question: pick.question,
           answer: pick.answer,
@@ -264,35 +305,17 @@ export function buildBankOnlyTutorTools(sessionId: string): StructuredToolInterf
         }
         return JSON.stringify(payload);
       } catch (e) {
-        logger.error(`[tutor-tool drawNextBankQuestion] ${e}`);
+        logger.error(`[tutor-tool evaluateAndDrawNext] ${e}`);
         throw e;
       }
     },
     {
-      name: 'drawNextBankQuestion',
+      name: 'evaluateAndDrawNext',
       description:
-        'Draw the next bank question from the server-managed category-ordered cursor. Categories walked in first-appearance order; questions within each in JSON file order. Pass skip="question" to skip current, skip="category" to jump to next category, skip="none" otherwise. Returns { newCategory:true, categoryName } when entering a new category, or { done:true } when exhausted.',
-      schema: z.object({
-        skip: z.enum(['none', 'question', 'category']).default('none'),
-      }),
+        "Fused tool: optionally record an evaluation of the learner's pending answer AND/OR draw the next bank question from the server-managed category-ordered cursor — in one call. When the learner has answered, pass BOTH `evaluation` and `draw` together. Pass only `evaluation` to record without advancing the cursor (e.g. a deferred-eval resolution). Pass only `draw` to advance without recording (first question, redundant re-draw with draw.skip='question'). draw.skip: 'question' skips current, 'category' jumps to next category, 'none' otherwise. Returns { newCategory:true, categoryName } when entering a new category, { done:true } when exhausted. Response includes the gold answer; do not speak it until the learner has tried.",
+      schema: evaluateAndDrawNextSchema,
     },
   );
 
-  const recordTool = tool(
-    async (args: { topic: string; correct: boolean; note: string }) => {
-      appendEvalLog(sessionId, { topic: args.topic, correct: args.correct, note: args.note, at: Date.now() });
-      return JSON.stringify({ ok: true });
-    },
-    {
-      name: 'recordEvaluation',
-      description: "Record an evaluation of the learner's answer for self-tracking. Does not affect the conversation.",
-      schema: z.object({
-        topic: z.string(),
-        correct: z.boolean(),
-        note: z.string(),
-      }),
-    },
-  );
-
-  return [listTool, readTool, drawNextTool, recordTool] as StructuredToolInterface[];
+  return [listTool, readTool, evaluateAndDrawNextTool] as StructuredToolInterface[];
 }

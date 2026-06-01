@@ -35,7 +35,9 @@ export class LLMService implements ILLMService {
       ];
 
       logger.debug(`Sending ${messages.length} messages to Ollama`);
+      const startedAt = Date.now();
       const response = await this.model.invoke(langchainMessages);
+      logger.debug(`[ollama] chat ok latencyMs=${Date.now() - startedAt}`);
 
       const content = typeof response.content === 'string'
         ? response.content
