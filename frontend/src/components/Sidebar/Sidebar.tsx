@@ -19,9 +19,10 @@ interface Props {
   onMessage: (m: Message | null) => void;
   onAudioEndRef: (cb: () => void) => void;
   onPttAvailableChange: (v: boolean) => void;
+  onSpeakingChange: (v: boolean) => void;
 }
 
-export function Sidebar({ recorder, onMessage, onAudioEndRef, onPttAvailableChange }: Props) {
+export function Sidebar({ recorder, onMessage, onAudioEndRef, onPttAvailableChange, onSpeakingChange }: Props) {
   const [mode, setMode] = useState<Mode>('quiz');
   const [sessionActive, setSessionActive] = useState(false);
 
@@ -36,6 +37,7 @@ export function Sidebar({ recorder, onMessage, onAudioEndRef, onPttAvailableChan
           onAudioEndRef={onAudioEndRef}
           onPttAvailableChange={onPttAvailableChange}
           onActiveChange={setSessionActive}
+          onSpeakingChange={onSpeakingChange}
         />
       )}
       {mode === 'tutor' && (
@@ -45,6 +47,7 @@ export function Sidebar({ recorder, onMessage, onAudioEndRef, onPttAvailableChan
           onAudioEndRef={onAudioEndRef}
           onPttAvailableChange={onPttAvailableChange}
           onActiveChange={setSessionActive}
+          onSpeakingChange={onSpeakingChange}
         />
       )}
     </aside>

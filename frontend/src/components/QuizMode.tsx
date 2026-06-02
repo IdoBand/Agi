@@ -17,14 +17,19 @@ interface Props {
   onAudioEndRef: (cb: () => void) => void;
   onPttAvailableChange: (v: boolean) => void;
   onActiveChange: (v: boolean) => void;
+  onSpeakingChange: (v: boolean) => void;
 }
 
-export function QuizMode({ recorder, onMessage, onAudioEndRef, onPttAvailableChange, onActiveChange }: Props) {
+export function QuizMode({ recorder, onMessage, onAudioEndRef, onPttAvailableChange, onActiveChange, onSpeakingChange }: Props) {
   const quiz = useQuiz(recorder, onPttAvailableChange);
 
   useEffect(() => {
     onActiveChange(quiz.phase !== 'idle');
   }, [quiz.phase, onActiveChange]);
+
+  useEffect(() => {
+    onSpeakingChange(quiz.isAudioPlaying);
+  }, [quiz.isAudioPlaying, onSpeakingChange]);
 
   useEffect(() => {
     onMessage(quiz.currentMessage);

@@ -38,6 +38,7 @@ export default function App() {
   const [isModelLoaded, setIsModelLoaded] = useState(false);
   const [currentMessage, setCurrentMessage] = useState<Message | null>(null);
   const [pttAvailable, setPttAvailable] = useState(false);
+  const [tutorSpeaking, setTutorSpeaking] = useState(false);
   const audioEndCbRef = useRef<() => void>(() => {});
 
   const recorder = useVoiceRecorder();
@@ -55,6 +56,7 @@ export default function App() {
         onMessage={handleMessage}
         onAudioEndRef={registerAudioEndCb}
         onPttAvailableChange={setPttAvailable}
+        onSpeakingChange={setTutorSpeaking}
       />
 
       <div className={styles.stage}>
@@ -76,7 +78,7 @@ export default function App() {
 
         <SpeechBubbleVisualizer />
 
-        <MediaConsole recorder={recorder} pttAvailable={pttAvailable} />
+        <MediaConsole recorder={recorder} pttAvailable={pttAvailable} speaking={tutorSpeaking} />
 
         {!isModelLoaded && <LoadingOverlay />}
       </div>

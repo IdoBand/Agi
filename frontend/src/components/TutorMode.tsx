@@ -16,14 +16,19 @@ interface Props {
   onAudioEndRef: (cb: () => void) => void;
   onPttAvailableChange: (v: boolean) => void;
   onActiveChange: (v: boolean) => void;
+  onSpeakingChange: (v: boolean) => void;
 }
 
-export function TutorMode({ recorder, onMessage, onAudioEndRef, onPttAvailableChange, onActiveChange }: Props) {
+export function TutorMode({ recorder, onMessage, onAudioEndRef, onPttAvailableChange, onActiveChange, onSpeakingChange }: Props) {
   const tutor = useTutorChat(recorder, true, onPttAvailableChange);
 
   useEffect(() => {
     onActiveChange(tutor.sessionId !== null);
   }, [tutor.sessionId, onActiveChange]);
+
+  useEffect(() => {
+    onSpeakingChange(tutor.phase === 'speaking');
+  }, [tutor.phase, onSpeakingChange]);
 
   useEffect(() => {
     onMessage(tutor.currentMessage);
