@@ -19,6 +19,32 @@ interface TranslateResponse {
   translatedText: string;
 }
 
+const BANK_HINTS: readonly { label: string; say: string }[] = [
+  { label: 'Skip question', say: 'say "skip"' },
+  { label: 'Skip category', say: 'say "skip category"' },
+  { label: 'List topics', say: 'say "what topics"' },
+  { label: 'Jump to a topic', say: 'say a topic name or number' },
+];
+
+const BANK_TOPICS: readonly string[] = [
+  'MAGÁRÓL',
+  'CSALÁD',
+  'Tanulás',
+  'Munkahely',
+  'Katonaság',
+  'hobbi',
+  'Tervei',
+  'Utazás',
+  'Nyelvtudás',
+  'Magyarország',
+  'Jogosítvány/ vezetői engedély',
+  'állampolgárság',
+  'Napirend',
+  'Időjárás',
+  'general',
+  'Lakóhely',
+];
+
 export function TutorControlPanel({ phase, sessionId, transcript, micSelected, bankOnly, onBankOnlyChange, onStart, onBack }: Props) {
   const [showHistory, setShowHistory] = useState(true);
   const [hideTutor, setHideTutor] = useState(false);
@@ -82,6 +108,28 @@ export function TutorControlPanel({ phase, sessionId, transcript, micSelected, b
   if (!sessionId) {
     return (
       <div className={styles['start-wrap']}>
+        {bankOnly && (
+          <div className={styles.hints}>
+            <span className={styles['hints-title']}>Bank-only mode tips</span>
+            {BANK_HINTS.map((h) => (
+              <div className={styles['hint-row']} key={h.label}>
+                <span className={styles['hint-label']}>{h.label}</span>
+                <span className={styles['hint-say']}>{h.say}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {bankOnly && (
+          <div className={styles.topics}>
+            <span className={styles['topics-title']}>Topics</span>
+            {BANK_TOPICS.map((name, i) => (
+              <div className={styles['topic-row']} key={name}>
+                <span className={styles['topic-num']}>{i + 1}</span>
+                <span className={styles['topic-name']}>{name}</span>
+              </div>
+            ))}
+          </div>
+        )}
         {!micSelected && <span className={styles.warning}>Select a microphone first</span>}
         <ToggleSetting label="Bank-only mode" checked={bankOnly} onChange={onBankOnlyChange} />
         <button

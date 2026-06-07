@@ -37,6 +37,23 @@ export function dropBankCursor(sessionId: string): void {
   bankCursors.delete(sessionId);
 }
 
+// Resolve a learner topic pick — a 1-based number ("3") or an exact (case-insensitive)
+// category name ("CSALÁD") — to a 0-based index into `categories`. Throws on out-of-range
+// number or unknown name so the caller surfaces it as a tool error.
+function resolveTopicIndex(input: string, categories: string[]): number {
+  const trimmed = input.trim();
+  if (/^\d+$/.test(trimmed)) {
+    const n = parseInt(trimmed, 10);
+    if (n < 1 || n > categories.length) {
+      throw new Error(`topic number ${n} out of range 1..${categories.length}`);
+    }
+    return n - 1;
+  }
+  const idx = categories.findIndex((c) => c.toLowerCase() === trimmed.toLowerCase());
+  if (idx === -1) throw new Error(`unknown topic "${input}"`);
+  return idx;
+}
+
 export function appendEvalLog(sessionId: string, entry: TutorEvalLogEntry): void {
   const list = evalLogs.get(sessionId) ?? [];
   list.push(entry);
@@ -204,6 +221,24 @@ export function buildBankOnlyTutorTools(sessionId: string): StructuredToolInterf
     },
   );
 
+  const listTopicsTool = tool(
+    async () => {
+      try {
+        const { categories } = await buildBankCursor();
+        return JSON.stringify({ topics: categories.map((name, i) => ({ number: i + 1, name })) });
+      } catch (e) {
+        logger.error(`[tutor-tool listTopics] ${e}`);
+        throw e;
+      }
+    },
+    {
+      name: 'listTopics',
+      description:
+        'List the bank topic categories in fixed order, each with its 1-based number. Read-only — does not draw or move the cursor. Call when the learner asks which topics exist, or to get canonical names before a jump.',
+      schema: z.object({}),
+    },
+  );
+
   const evaluateAndDrawNextSchema = z.object({
     evaluation: evaluationSchema
       .optional()
@@ -211,6 +246,12 @@ export function buildBankOnlyTutorTools(sessionId: string): StructuredToolInterf
     draw: z
       .object({
         skip: z.enum(['none', 'question', 'category']).default('none'),
+        jumpToTopic: z
+          .string()
+          .optional()
+          .describe(
+            "jump to a specific topic — its number from listTopics (e.g. '3') or category name (e.g. 'CSALÁD'); when set, skip is ignored",
+          ),
       })
       .optional()
       .describe('draw the next bank question; omit for an eval-only call'),
@@ -249,7 +290,13 @@ export function buildBankOnlyTutorTools(sessionId: string): StructuredToolInterf
         let announceNewCategory = firstEver;
         const startCategoryIdx = cur.categoryIdx;
 
-        if (skip === 'category') {
+        const jumpRaw = args.draw.jumpToTopic?.trim();
+        if (jumpRaw) {
+          // Jump wins over skip — reposition the cursor to the chosen topic.
+          cur.categoryIdx = resolveTopicIndex(jumpRaw, cur.categories); // throws → tool error
+          cur.questionIdx = 0;
+          announceNewCategory = true;
+        } else if (skip === 'category') {
           cur.categoryIdx += 1;
           cur.questionIdx = 0;
         } else if (skip === 'question') {
@@ -312,10 +359,10 @@ export function buildBankOnlyTutorTools(sessionId: string): StructuredToolInterf
     {
       name: 'evaluateAndDrawNext',
       description:
-        "Fused tool: optionally record an evaluation of the learner's pending answer AND/OR draw the next bank question from the server-managed category-ordered cursor — in one call. When the learner has answered, pass BOTH `evaluation` and `draw` together. Pass only `evaluation` to record without advancing the cursor (e.g. a deferred-eval resolution). Pass only `draw` to advance without recording (first question, redundant re-draw with draw.skip='question'). draw.skip: 'question' skips current, 'category' jumps to next category, 'none' otherwise. Returns { newCategory:true, categoryName } when entering a new category, { done:true } when exhausted. Response includes the gold answer; do not speak it until the learner has tried.",
+        "Fused tool: optionally record an evaluation of the learner's pending answer AND/OR draw the next bank question from the server-managed category-ordered cursor — in one call. When the learner has answered, pass BOTH `evaluation` and `draw` together. Pass only `evaluation` to record without advancing the cursor (e.g. a deferred-eval resolution). Pass only `draw` to advance without recording (first question, redundant re-draw with draw.skip='question'). draw.skip: 'question' skips current, 'category' jumps to next category, 'none' otherwise. draw.jumpToTopic (number from listTopics or category name) repositions the cursor to that topic, then continues sequentially once it is exhausted; when set, skip is ignored. Returns { newCategory:true, categoryName } when entering a new category, { done:true } when exhausted. Response includes the gold answer; do not speak it until the learner has tried.",
       schema: evaluateAndDrawNextSchema,
     },
   );
 
-  return [listTool, readTool, evaluateAndDrawNextTool] as StructuredToolInterface[];
+  return [listTool, readTool, listTopicsTool, evaluateAndDrawNextTool] as StructuredToolInterface[];
 }

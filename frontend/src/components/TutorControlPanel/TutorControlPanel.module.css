@@ -23,6 +23,73 @@
   font-size: 0.875rem;
 }
 
+.hints {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  background: var(--color-surface-translucent);
+  border-radius: 0.25rem;
+  font-size: 0.8125rem;
+}
+
+.hints-title {
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: 0.25rem;
+}
+
+.hint-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.hint-label {
+  color: var(--color-text-bright);
+}
+
+.hint-say {
+  color: var(--color-text-muted);
+  font-style: italic;
+  text-align: right;
+}
+
+.topics {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: 0.5rem;
+  background: var(--color-surface-translucent);
+  border-radius: 0.25rem;
+  font-size: 0.8125rem;
+}
+
+.topics-title {
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: 0.25rem;
+}
+
+.topic-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+.topic-num {
+  min-width: 1.25rem;
+  text-align: right;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.topic-name {
+  color: var(--color-text-bright);
+}
+
 .start-btn {
   padding: 0.75rem 2rem;
   border-radius: 9999px;

@@ -68,7 +68,8 @@ export async function getRandomQuestionMeta(count: number): Promise<Question[]> 
 }
 
 export async function getAllQuestionMetas(): Promise<Question[]> {
-  return loadQuestions();
+  const all = await loadQuestions();
+  return all.filter((q) => q.answer.trim().length > 0);
 }
 
 export async function getRandomQuestions(count: number): Promise<QuizQuestion[]> {
