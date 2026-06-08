@@ -6,6 +6,8 @@
 }
 .blur:hover {
   filter: blur(0);
+  user-select: text;
+  cursor: auto;
 }
 
 /* Start screen */
