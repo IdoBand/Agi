@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { ChatRequest } from '../types/request.types.js';
 import { WorkflowContext, deleteWorkflowDir } from '../utils/file.utils.js';
-import { getRandomQuestions, getShuffledQuestions, evaluateAnswer, evaluateAnswerUnified } from '../services/quiz.service.js';
+import { getRandomQuestions, getShuffledQuestions, evaluateAnswerUnified } from '../services/quiz.service.js';
 import { logger } from '../utils/logger.js';
 
 export async function handleQuizStart(
@@ -66,7 +66,6 @@ export async function handleQuizEvaluate(
   logger.info('Quiz evaluate request received');
   try {
     const ctx: WorkflowContext = { workflowId: req.workflowId! };
-    // const result = await evaluateAnswer(audioFile.path, questionText, correctAnswer, ctx);
     const result = await evaluateAnswerUnified(audioFile.path, questionText, correctAnswer, ctx);
     logger.info(`Quiz eval: correct=${result.correct}`);
     res.json(result);

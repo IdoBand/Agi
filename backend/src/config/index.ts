@@ -25,11 +25,6 @@ export const config = {
     temperatureInc: parseFloat(process.env.STT_TEMPERATURE_INC ?? '0'),
   },
 
-  ollama: {
-    baseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
-    model: process.env.OLLAMA_MODEL,
-  },
-
   openai: {
     apiKey: process.env.OPENAI_API_KEY || '',
     model: process.env.OPENAI_MODEL || 'gpt-4o',
@@ -65,7 +60,6 @@ export const config = {
   },
 
   paths: {
-    rhubarb: process.env.RHUBARB_PATH || './bin/rhubarb/rhubarb.exe',
     ffmpeg: process.env.FFMPEG_PATH || './bin/ffmpeg/ffmpeg.exe',
     temp: path.join(process.cwd(), 'temp'),
     audios: path.join(process.cwd(), 'audios'),

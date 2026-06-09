@@ -1,19 +1,10 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { Question, QuizQuestion, QuizEvaluateResponse } from '../types/quiz.types.js';
-import { LipsyncData } from '../types/message.types.js';
-import { z } from 'zod';
 import { readFileAsBase64 } from '../utils/file.utils.js';
-import { sttService } from './stt/stt.service.js';
-import { chatgptService } from './chat/chatgpt.service.js';
 import { transcribeAndEvaluate } from './gpt-multi-service/unified-eval.service.js';
 import { logger } from '../utils/logger.js';
 import { WorkflowContext } from '../utils/file.utils.js';
-
-const EvalResponseSchema = z.object({
-  correct: z.boolean(),
-  explanation: z.string(),
-});
 
 const QUESTIONS_PATH = path.resolve('knowledge/citizenship/mergedQuestions.json');
 const AUDIO_DIR = path.resolve('assets/questionsAudio');
@@ -38,7 +29,6 @@ function shuffle<T>(arr: T[]): T[] {
 
 async function loadQuestionAudio(question: Question, index: number): Promise<QuizQuestion> {
   const mp3Path = path.join(AUDIO_DIR, `${question.id}.mp3`);
-  const jsonPath = path.join(AUDIO_DIR, `${question.id}.json`);
 
   try {
     await fs.access(mp3Path);
@@ -47,8 +37,6 @@ async function loadQuestionAudio(question: Question, index: number): Promise<Qui
   }
 
   const audio = await readFileAsBase64(mp3Path);
-  const lipsyncRaw = await fs.readFile(jsonPath, 'utf-8');
-  const lipsync: LipsyncData = JSON.parse(lipsyncRaw);
 
   return {
     index,
@@ -57,7 +45,6 @@ async function loadQuestionAudio(question: Question, index: number): Promise<Qui
     englishTranslation: question.englishTranslation,
     category: question.category,
     audio,
-    lipsync,
     facialExpression: 'default',
   };
 }
@@ -88,43 +75,6 @@ export async function getShuffledQuestions(count: number): Promise<QuizQuestion[
   const questions = await loadQuestions();
   const selected = shuffle(questions.slice(0, count));
   return Promise.all(selected.map((q, i) => loadQuestionAudio(q, i)));
-}
-
-const EVAL_SYSTEM_PROMPT = `Te egy kvíz értékelő asszisztens vagy. A felhasználó egy kérdésre válaszolt szóban (beszédfelismeréssel átiratva).
-
-Szabályok:
-- Rövid válaszok (akár egyetlen szó) teljesen elfogadhatók, ha a jelentés stimmel.
-- A beszédfelismerés gyakran kisebb helyesírási hibákat ejt — ezeket ignoráld.
-- A kis- és nagybetűk közötti különbséget ignoráld (pl. "focizni" = "Focizni").
-- Csak azt vizsgáld, hogy a válasz JELENTÉSE megegyezik-e a helyes válasszal, vagy közel áll hozzá.
-- NE büntesd a választ a rövidsége vagy részletessége miatt.
-
-NE használj <think> tageket vagy bármilyen gondolkodási blokkot. CSAK a JSON-t add vissza, semmi mást.
-
-Válaszolj PONTOSAN ebben a JSON formátumban:
-{"correct": true/false, "explanation": "short explanation in English"}`;
-
-export async function evaluateAnswer(
-  audioPath: string,
-  questionText: string,
-  correctAnswer: string,
-  ctx?: WorkflowContext
-): Promise<QuizEvaluateResponse> {
-  logger.debug(`[quiz-evaluate-svc] audioPath=${audioPath} questionText=${questionText} correctAnswer=${correctAnswer}`);
-  // STT
-  const userTranscript = await sttService.transcribe(audioPath, ctx);
-  logger.info(`Quiz STT: "${userTranscript}"`);
-
-  // Build eval prompt
-  const userPrompt = `Kérdés: ${questionText}\nHelyes válasz: ${correctAnswer}\nA felhasználó válasza: ${userTranscript}`;
-  const messages = [
-    { role: 'user' as const, content: userPrompt },
-  ];
-
-  const result = await chatgptService.chatWithSchema(messages, EVAL_SYSTEM_PROMPT, EvalResponseSchema);
-  logger.info(`Quiz eval result: ${JSON.stringify(result)}`);
-
-  return { correct: result.correct, explanation: result.explanation, userTranscript };
 }
 
 export async function evaluateAnswerUnified(

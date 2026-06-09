@@ -12,7 +12,7 @@ class TTSService implements ITTSService {
     this.elevenLabs = new ElevenLabsClient({
       apiKey: config.elevenLabs.apiKey,
     });
-    logger.info('TTS Service initialized');
+    logger.info('TTS service initialized: ElevenLabs');
   }
 
   async synthesize(text: string): Promise<Buffer> {

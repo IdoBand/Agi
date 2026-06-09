@@ -22,7 +22,7 @@ class GoogleTranslateService implements ITranslationService {
   constructor() {
     this.apiKey = config.googleTranslate.apiKey;
     this.endpoint = config.googleTranslate.endpoint;
-    logger.info('Google Translate service initialized');
+    logger.info('Translation service initialized: Google');
   }
 
   async translate(req: TranslateRequest): Promise<TranslateResult> {

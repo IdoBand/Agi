@@ -16,7 +16,7 @@ export class WhisperSTTService implements ISTTService {
   constructor() {
     this.ffmpegPath = config.paths.ffmpeg;
     this.startWhisperServer();
-    logger.info('Whisper STT Service initialized');
+    logger.info(`STT service initialized: Whisper (model: ${path.basename(config.whisper.modelPath, '.bin')})`);
   }
 
   private startWhisperServer(): void {

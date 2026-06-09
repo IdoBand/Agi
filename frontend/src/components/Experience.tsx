@@ -26,7 +26,6 @@ export function Experience({ currentMessage, onAudioEnd }: ExperienceProps) {
       <Avatar
         modelUrl="/models/avatar.glb"
         audio={currentMessage?.audio}
-        lipsync={currentMessage?.lipsync}
         facialExpression={currentMessage?.facialExpression || 'smile'}
         onAudioEnd={onAudioEnd}
         position={[0, -1.5, 0]}

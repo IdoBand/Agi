@@ -1,10 +1,9 @@
-import { useEffect, useRef, useMemo } from 'react';
+import { useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { AvatarProps } from '../types/avatar.types';
-import { MouthCue } from '../types/message.types';
-import { visemeMapping, allVisemes, lerp } from '../utils/lipsync';
+import { allVisemes, lerp } from '../utils/lipsync';
 import { getAudioContext } from '../utils/audioContext';
 import { setSharedAnalyser } from '../utils/sharedAnalyser';
 import {
@@ -15,7 +14,6 @@ import {
 export function Avatar({
   modelUrl,
   audio,
-  lipsync,
   facialExpression = 'default',
   onAudioEnd,
   position = [0, -1.5, 0],
@@ -97,20 +95,6 @@ export function Avatar({
     };
   }, [audio, onAudioEnd]);
 
-  // Get current viseme based on audio time
-  const getCurrentViseme = useMemo(() => {
-    if (!lipsync?.mouthCues?.length) {
-      return () => 'X';
-    }
-
-    return (currentTime: number): string => {
-      const cue = lipsync.mouthCues.find(
-        (c: MouthCue) => currentTime >= c.start && currentTime < c.end
-      );
-      return cue?.value || 'X';
-    };
-  }, [lipsync]);
-
   // Smooth morph target transitions - applies to ALL meshes with morph targets
   const lerpMorphTarget = (target: string, value: number, speed: number) => {
     scene.traverse((child) => {
@@ -130,11 +114,10 @@ export function Avatar({
   // Animation frame
   useFrame(() => {
     const audioElement = audioRef.current;
-    const currentTime = audioElement?.currentTime || 0;
     const isAudioPlaying = audioElement && !audioElement.paused;
 
-    // Amplitude-driven mouth (used when no lipsync cues are provided, e.g. streaming path)
-    const useAmplitudeMouth = isAudioPlaying && !lipsync && !!analyserRef.current;
+    // Amplitude-driven mouth (RMS of the playing audio drives the open/close)
+    const useAmplitudeMouth = isAudioPlaying && !!analyserRef.current;
     const amplitudeVisemes = new Set<string>(['viseme_AA', 'viseme_O']);
 
     // Reset all visemes (skip the two AA/O drive amplitude path manages itself)
@@ -145,12 +128,8 @@ export function Avatar({
       lerpMorphTarget(viseme, 0, 0.5);
     });
 
-    // Apply current viseme if audio is playing
-    if (isAudioPlaying && lipsync) {
-      const viseme = getCurrentViseme(currentTime);
-      const morphTarget = visemeMapping[viseme] || 'viseme_PP';
-      lerpMorphTarget(morphTarget, 1, 0.5);
-    } else if (useAmplitudeMouth) {
+    // Drive the mouth from audio amplitude while playing
+    if (useAmplitudeMouth) {
       const analyser = analyserRef.current!;
       const buf = amplitudeBufferRef.current!;
       analyser.getByteTimeDomainData(buf);

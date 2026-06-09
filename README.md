@@ -1,99 +1,105 @@
 # AGI - Voice-Activated 3D Avatar
 
-Voice-activated 3D avatar system with Hungarian language support.
+Voice-activated 3D avatar for learning Hungarian. Two modes share one avatar
+pipeline: a free-form **Tutor** (Claude via the Agent SDK) and a strict
+**Quiz** (pre-generated questions + spoken-answer evaluation).
 
 ## Project Structure
 
 ```
-C:\Users\USER\Desktop\projects\agi\
+agi/
 ├── backend/                    # Express + TypeScript
 │   ├── src/
 │   │   ├── config/index.ts
-│   │   ├── controllers/chat.controller.ts
+│   │   ├── app.ts / index.ts        # app wiring + bootstrap
+│   │   ├── routes/                  # tutor, quiz, translation
+│   │   ├── controllers/             # tutor, quiz, translation
 │   │   ├── services/
-│   │   │   ├── audio.service.ts    (Whisper STT + ElevenLabs TTS)
-│   │   │   ├── llm.service.ts      (Ollama + LangChain)
-│   │   │   └── lipsync.service.ts  (Rhubarb)
-│   │   ├── middleware/
-│   │   ├── types/
-│   │   └── utils/
+│   │   │   ├── stt/                 # Whisper (default) | OpenAI STT
+│   │   │   ├── tts/                 # ElevenLabs
+│   │   │   ├── translation/         # Google Translate
+│   │   │   ├── gpt-multi-service/   # unified transcribe+evaluate (quiz)
+│   │   │   └── tutor/               # Claude Agent SDK runner + tools
+│   │   ├── scripts/                 # generate-question-audio (offline TTS)
+│   │   ├── middleware/ types/ utils/
 │   ├── bin/
-│   │   ├── ffmpeg/
-│   │   │   └── ffmpeg.exe          (Audio conversion)
-│   │   └── rhubarb/
-│   │       └── rhubarb.exe         (Lip sync generation)
-│   ├── package.json
-│   └── tsconfig.json
+│   │   ├── ffmpeg/ffmpeg.exe         # audio conversion
+│   │   └── whisper/                  # whisper-server.exe + models/
+│   └── package.json
 │
 └── frontend/                   # React + R3F + TypeScript
     ├── src/
-    │   ├── components/
-    │   │   ├── Avatar.tsx          (3D avatar with lipsync)
-    │   │   ├── Experience.tsx      (R3F scene)
-    │   │   └── PushToTalk.tsx      (Status indicator)
-    │   ├── hooks/
-    │   │   ├── useChat.ts          (API + T key handling)
-    │   │   └── useVoiceRecorder.ts (MediaRecorder)
-    │   ├── types/
-    │   └── utils/
-    ├── package.json
-    └── vite.config.ts
+    │   ├── components/Avatar.tsx     # amplitude-driven mouth
+    │   ├── components/Experience.tsx # R3F scene
+    │   ├── hooks/                    # useTutorChat, useQuiz, useVoiceRecorder
+    │   ├── types/ utils/
+    └── package.json
 ```
 
-## To Get Started
+## Endpoints
 
-**1. Backend:**
+```
+POST /tutor/turn       Tutor turn (multipart audio)
+POST /tutor/reset      Reset tutor session
+GET  /quiz/start       Start quiz round
+GET  /quiz/start/test  Start deterministic quiz round
+POST /quiz/evaluate    Evaluate spoken answer (multipart audio)
+POST /translate        Translate text
+GET  /health           Health check
+```
+
+## Getting Started
+
+**Backend:**
 ```bash
-cd C:\Users\USER\Desktop\projects\agi\backend
+cd backend
 npm install
-# Edit .env with your ElevenLabs API key
-# Ensure Ollama is running with llama3 model
-# Ensure Whisper CLI is installed (pip install openai-whisper)
-# FFmpeg and Rhubarb binaries are included in ./bin/
+# Edit .env with API keys (see Prerequisites)
 npm run dev
 ```
 
-**2. Frontend:**
+**Frontend:**
 ```bash
-cd C:\Users\USER\Desktop\projects\agi\frontend
+cd frontend
 npm install
 # Add your avatar.glb to ./public/models/
 npm run dev
 ```
 
-**3. Use:**
-- Open http://localhost:5173
-- Hold **T** key to record voice
-- Release **T** to send to backend
-- Avatar responds with synced lipsync
+Open http://localhost:5173 and hold **T** to record voice.
 
 ## Prerequisites
 
-- **Ollama** running with `llama3` model
-- **Python Whisper CLI** (`pip install openai-whisper`)
-- **ElevenLabs API key**
-- **ReadyPlayer Me avatar** `.glb` file
+- **Anthropic API key** (`ANTHROPIC_API_KEY`) — tutor (Claude Agent SDK)
+- **OpenAI API key** (`OPENAI_API_KEY`) — quiz answer evaluation (and optional OpenAI STT)
+- **ElevenLabs API key** (`ELEVEN_LABS_API_KEY`) — TTS
+- **Google Translate API key** (`GOOGLE_TRANSLATE_API_KEY`) — translation
+- **ReadyPlayer Me avatar** `.glb` in `frontend/public/models/`
 
 ## Bundled Binaries
 
-FFmpeg and Rhubarb are included in `backend/bin/`:
-
 ```
 backend/bin/
-├── ffmpeg/
-│   └── ffmpeg.exe      # Audio conversion (MP3→WAV)
-└── rhubarb/
-    └── rhubarb.exe     # Lip sync generation
+├── ffmpeg/ffmpeg.exe      # audio conversion (used by Whisper STT + quiz eval)
+└── whisper/
+    ├── whisper-server.exe  # local STT server (default provider)
+    └── models/             # e.g. ggml-medium.bin
 ```
 
-Verify paths in `backend/.env`:
+Relevant `.env` paths:
 ```
 FFMPEG_PATH=./bin/ffmpeg/ffmpeg.exe
-RHUBARB_PATH=./bin/rhubarb/rhubarb.exe
+WHISPER_SERVER_PATH=./bin/whisper/whisper-server.exe
+WHISPER_MODEL_PATH=./bin/whisper/models/ggml-medium.bin
+# STT_PROVIDER=openai   # optional: use OpenAI STT instead of local Whisper
 ```
 
-### Updating Binaries
+**FFmpeg:** https://ffmpeg.org/download.html
+**whisper.cpp server + models:** https://github.com/ggerganov/whisper.cpp
 
-**FFmpeg:** Download from https://ffmpeg.org/download.html
+## Notes
 
-**Rhubarb:** Download from https://github.com/DanielSWolf/rhubarb-lip-sync/releases
+- The avatar mouth is driven by **audio amplitude on the frontend** — there is
+  no server-side lipsync step.
+- Quiz audio is pre-generated offline via
+  `npx tsx src/scripts/generate-question-audio.ts` (writes `.mp3` per question).

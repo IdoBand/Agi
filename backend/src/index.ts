@@ -29,10 +29,13 @@ async function main(): Promise<void> {
     app.listen(config.port, () => {
       logger.info(`Server running on http://localhost:${config.port}`);
       logger.info('Endpoints:');
-      logger.info('  POST /chat        - Voice chat (multipart/form-data with audio file)');
-      logger.info('  POST /chat/text   - Text chat (JSON body with message)');
-      logger.info('  POST /chat/clear  - Clear conversation history');
-      logger.info('  GET  /health      - Health check');
+      logger.info('  POST /tutor/turn       - Tutor turn (multipart/form-data with audio file)');
+      logger.info('  POST /tutor/reset      - Reset tutor session');
+      logger.info('  GET  /quiz/start       - Start quiz round');
+      logger.info('  GET  /quiz/start/test  - Start deterministic quiz round');
+      logger.info('  POST /quiz/evaluate    - Evaluate quiz answer (multipart/form-data with audio file)');
+      logger.info('  POST /translate        - Translate text');
+      logger.info('  GET  /health           - Health check');
     });
   } catch (error) {
     logger.error(`Failed to start server: ${error}`);

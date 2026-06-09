@@ -79,7 +79,6 @@ export function useQuiz(
       role: 'assistant',
       content: question.text,
       audio: question.audio,
-      lipsync: question.lipsync,
       facialExpression: question.facialExpression,
     });
     setIsAudioPlaying(true);

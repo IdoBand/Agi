@@ -2,7 +2,8 @@
 
 Free-form conversational Hungarian tutor driven by Claude via the Agent SDK
 (`@anthropic-ai/claude-agent-sdk`). Runs alongside the strict quiz mode — both
-share the same STT / TTS / lipsync / avatar pipeline.
+share the same STT / TTS / avatar pipeline. The avatar mouth is driven on the
+frontend by audio amplitude (no server-side lipsync).
 
 ## Files
 
@@ -31,9 +32,8 @@ mic Blob ─► POST /tutor/turn ─► uploadAudio (multer writes temp/<wf>/inp
               │  results fed back automatically by SDK), accumulate text
               └─ append {user,assistant} to history; return text (or fallback)
        ─► ttsService.synthesize(text) ─► mp3 buf   [reused: tts.service.ts]
-       ─► saveToFile + lipsyncService.generateLipsync [reused: lipsync.service.ts]
-       ─► read mp3 ─► base64
-       ─► { content, audio, lipsync, facialExpression, userTranscript }
+       ─► saveToFile ─► read mp3 ─► base64
+       ─► { content, audio, facialExpression, userTranscript }
 ```
 
 ## Why this architecture
@@ -107,7 +107,6 @@ there cannot be read (defense in depth alongside the path-traversal guard).
 |---|---|
 | `sttService.transcribe(path, ctx)` | learner audio → text |
 | `ttsService.synthesize(text)` + `saveToFile` | reply text → mp3 |
-| `lipsyncService.generateLipsync(path, ctx)` | mp3 → mouth cues |
 | `uploadAudio` middleware | multipart parsing + temp dir + `req.workflowId` |
 | `WorkflowContext` + `deleteWorkflowDir` | per-request temp file lifecycle |
 | `loadQuestions()` (via new `getRandomQuestionMeta`) | tool 3's question source |
@@ -145,8 +144,8 @@ first turn if it's missing rather than silently degrading.
 
 ## Known limitations / v2 ideas
 
-- **No streaming.** Reply lands as one chunk → TTS → lipsync → audio. Roughly
-  4-8s end-to-end. Sentence-level streaming is the obvious next step.
+- **Latency.** Reply → TTS → audio is a few seconds end-to-end. The avatar
+  mouth animates from audio amplitude on the client (no lipsync step).
 - **In-memory history.** Backend restart drops sessions. Persist to disk or
   use the SDK's own `resume:` if needed.
 - **Empty-reply fallback.** If the model only emits tool calls with no final

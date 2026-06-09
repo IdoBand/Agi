@@ -1,9 +1,7 @@
 import express from 'express';
 import cors from 'cors';
-import { uploadAudio } from './middleware/upload.middleware.js';
 import { errorHandler } from './middleware/error.middleware.js';
 import { requestLogger } from './middleware/request-logger.middleware.js';
-import { handleVoiceChat, handleTextChat, clearHistory } from './controllers/chat.controller.js';
 import { ensureDir } from './utils/file.utils.js';
 import { config } from './config/index.js';
 import quizRoutes from './routes/quiz.routes.js';
@@ -38,11 +36,6 @@ export async function createApp(): Promise<express.Application> {
 
   // Translation routes
   app.use('/translate', translationRoutes);
-
-  // Chat routes
-  app.post('/chat', uploadAudio, handleVoiceChat);
-  app.post('/chat/text', handleTextChat);
-  app.post('/chat/clear', clearHistory);
 
   // Error handling
   app.use(errorHandler);

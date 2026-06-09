@@ -1,4 +1,4 @@
-import { FacialExpression, LipsyncData } from './message.types';
+import { FacialExpression } from './message.types';
 
 export type QuizPhase =
   | 'idle'
@@ -17,7 +17,6 @@ export interface QuizQuestion {
   englishTranslation: string;
   category: string;
   audio: string;
-  lipsync: LipsyncData;
   facialExpression: FacialExpression;
 }
 

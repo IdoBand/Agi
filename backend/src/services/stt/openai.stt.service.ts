@@ -11,7 +11,7 @@ export class OpenAISTTService implements ISTTService {
 
   constructor() {
     this.openai = new OpenAI({ apiKey: config.openai.apiKey });
-    logger.info('OpenAI STT Service initialized');
+    logger.info(`STT service initialized: OpenAI (model: ${config.openai.sttModel})`);
   }
 
   async transcribe(audioPath: string, ctx?: WorkflowContext, prompt?: string): Promise<string> {

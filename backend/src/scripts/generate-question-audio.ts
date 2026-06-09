@@ -8,7 +8,6 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 import fs from 'fs/promises';
 import { ttsService } from '../services/tts/tts.service.js';
-import { lipsyncService } from '../services/lipsync/lipsync.service.js';
 import { logger } from '../utils/logger.js';
 import { Question } from '../types/quiz.types.js';
 
@@ -33,7 +32,6 @@ async function main(): Promise<void> {
   for (let i = 0; i < subset.length; i++) {
     const q = subset[i];
     const mp3Path = path.join(OUTPUT_DIR, `${q.id}.mp3`);
-    const jsonPath = path.join(OUTPUT_DIR, `${q.id}.json`);
 
     // Skip if already generated (unless --force)
     if (!force) {
@@ -52,11 +50,6 @@ async function main(): Promise<void> {
     const audioBuffer = await ttsService.synthesize(`[calm, formal examiner tone] ${q.question}`);
     await fs.writeFile(mp3Path, audioBuffer);
     logger.info(`  Saved MP3: ${mp3Path}`);
-
-    // Lipsync
-    const lipsyncData = await lipsyncService.generateLipsync(mp3Path);
-    await fs.writeFile(jsonPath, JSON.stringify(lipsyncData, null, 2));
-    logger.info(`  Saved lipsync: ${jsonPath}`);
   }
 
   logger.info('Done');

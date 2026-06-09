@@ -1,4 +1,4 @@
-import { LipsyncData, FacialExpression } from './message.types.js';
+import { FacialExpression } from './message.types.js';
 
 export interface Question {
   id: string;
@@ -15,7 +15,6 @@ export interface QuizQuestion {
   englishTranslation: string;
   category: string;
   audio: string;
-  lipsync: LipsyncData;
   facialExpression: FacialExpression;
 }
 
