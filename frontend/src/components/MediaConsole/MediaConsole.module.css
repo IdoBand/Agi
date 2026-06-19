@@ -1,8 +1,5 @@
 .wrap {
-  position: absolute;
-  top: 0.75rem;
-  left: 0.75rem;
-  z-index: 20;
+  position: relative;
   height: 2.25rem;
   display: inline-flex;
   align-items: center;
@@ -44,13 +41,6 @@
 .mic-icon-wrap {
   position: relative;
   display: inline-flex;
-}
-
-.stop-overlay {
-  position: absolute;
-  inset: -6px;
-  color: var(--color-recording);
-  pointer-events: none;
 }
 
 .menu {

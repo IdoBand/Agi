@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Message } from '../types/message.types';
-import { TutorPhase, TutorTranscriptEntry, TurnEvent } from '../types/tutor.types';
+import { InterruptButtonState, TutorPhase, TutorTranscriptEntry, TurnEvent } from '../types/tutor.types';
 import { ensureAudioContextRunning } from '../utils/audioContext';
 
 interface VoiceRecorderInput {
@@ -21,6 +21,7 @@ export interface UseTutorChatReturn {
   startSession: () => void;
   resetSession: () => Promise<void>;
   onAssistantAudioEnd: () => void;
+  interrupt: () => void;
 }
 
 function newSessionId(): string {
@@ -56,12 +57,14 @@ export function useTutorChat(
   recorder: VoiceRecorderInput,
   active: boolean,
   onPttAvailableChange?: (v: boolean) => void,
+  onInterruptStateChange?: (s: InterruptButtonState) => void,
 ): UseTutorChatReturn {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [bankOnly, setBankOnly] = useState<boolean>(false);
   const [phase, setPhase] = useState<TutorPhase>('idle');
   const [currentMessage, setCurrentMessage] = useState<Message | null>(null);
   const [transcript, setTranscript] = useState<TutorTranscriptEntry[]>([]);
+  const [turnDone, setTurnDone] = useState<boolean>(false);
   const inFlightRef = useRef<AbortController | null>(null);
   const audioQueueRef = useRef<string[]>([]);
   const playingRef = useRef<boolean>(false);
@@ -73,6 +76,8 @@ export function useTutorChat(
     setSessionId(newSessionId());
     setTranscript([]);
     setCurrentMessage(null);
+    turnDoneRef.current = false;
+    setTurnDone(false);
     setPhase('listening');
   }, []);
 
@@ -95,11 +100,22 @@ export function useTutorChat(
     audioQueueRef.current = [];
     playingRef.current = false;
     turnDoneRef.current = false;
+    setTurnDone(false);
     setSessionId(null);
     setTranscript([]);
     setCurrentMessage(null);
     setPhase('idle');
   }, [sessionId]);
+
+  const interrupt = useCallback(() => {
+    if (!turnDoneRef.current) return;
+    audioQueueRef.current = [];
+    playingRef.current = false;
+    turnDoneRef.current = false;
+    setTurnDone(false);
+    setCurrentMessage(null);
+    setPhase('listening');
+  }, []);
 
   const playNext = useCallback(() => {
     const next = audioQueueRef.current.shift();
@@ -139,6 +155,7 @@ export function useTutorChat(
       audioQueueRef.current = [];
       playingRef.current = false;
       turnDoneRef.current = false;
+      setTurnDone(false);
       setPhase('thinking');
 
       const turnAt = Date.now();
@@ -194,6 +211,7 @@ export function useTutorChat(
               enqueueAudio(payload.base64);
             } else if (payload.type === 'done') {
               turnDoneRef.current = true;
+              setTurnDone(true);
               if (payload.fullHu && payload.fullHu !== assistantText) {
                 const finalText = payload.fullHu;
                 setTranscript((t) => {
@@ -220,6 +238,8 @@ export function useTutorChat(
         console.error('[tutor] turn error', err);
         audioQueueRef.current = [];
         playingRef.current = false;
+        turnDoneRef.current = false;
+        setTurnDone(false);
         setCurrentMessage(null);
         setPhase('listening');
       } finally {
@@ -237,6 +257,33 @@ export function useTutorChat(
     onPttAvailableChange(available);
     return () => onPttAvailableChange(false);
   }, [active, sessionId, phase, selectedDeviceId, isRecording, onPttAvailableChange]);
+
+  useEffect(() => {
+    if (!onInterruptStateChange) return;
+    const s: InterruptButtonState = !sessionId
+      ? 'hidden'
+      : phase === 'speaking' && turnDone
+        ? 'enabled'
+        : 'disabled';
+    onInterruptStateChange(s);
+    return () => onInterruptStateChange('hidden');
+  }, [sessionId, phase, turnDone, onInterruptStateChange]);
+
+  // N-key interrupt (fast-forward past trailing TTS once `done` arrived)
+  useEffect(() => {
+    if (!active || !sessionId) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key.toLowerCase() !== 'n' || e.repeat) return;
+      if (!turnDoneRef.current || phase !== 'speaking') return;
+      e.preventDefault();
+      interrupt();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [active, sessionId, phase, interrupt]);
 
   // T-key push-to-talk
   useEffect(() => {
@@ -286,5 +333,6 @@ export function useTutorChat(
     startSession,
     resetSession,
     onAssistantAudioEnd,
+    interrupt,
   };
 }

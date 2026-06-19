@@ -1,0 +1,6 @@
+.stop-overlay {
+  position: absolute;
+  inset: -6px;
+  color: var(--color-recording);
+  pointer-events: none;
+}

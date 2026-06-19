@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Message } from '../types/message.types';
+import { InterruptButtonState } from '../types/tutor.types';
 import { useTutorChat } from '../hooks/useTutorChat';
 import { TutorControlPanel } from './TutorControlPanel';
 
@@ -17,10 +18,12 @@ interface Props {
   onPttAvailableChange: (v: boolean) => void;
   onActiveChange: (v: boolean) => void;
   onSpeakingChange: (v: boolean) => void;
+  onInterruptRef?: (cb: () => void) => void;
+  onInterruptStateChange?: (s: InterruptButtonState) => void;
 }
 
-export function TutorMode({ recorder, onMessage, onAudioEndRef, onPttAvailableChange, onActiveChange, onSpeakingChange }: Props) {
-  const tutor = useTutorChat(recorder, true, onPttAvailableChange);
+export function TutorMode({ recorder, onMessage, onAudioEndRef, onPttAvailableChange, onActiveChange, onSpeakingChange, onInterruptRef, onInterruptStateChange }: Props) {
+  const tutor = useTutorChat(recorder, true, onPttAvailableChange, onInterruptStateChange);
 
   useEffect(() => {
     onActiveChange(tutor.sessionId !== null);
@@ -37,6 +40,10 @@ export function TutorMode({ recorder, onMessage, onAudioEndRef, onPttAvailableCh
   useEffect(() => {
     onAudioEndRef(tutor.onAssistantAudioEnd);
   }, [tutor.onAssistantAudioEnd, onAudioEndRef]);
+
+  useEffect(() => {
+    onInterruptRef?.(tutor.interrupt);
+  }, [tutor.interrupt, onInterruptRef]);
 
   return (
     <TutorControlPanel

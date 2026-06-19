@@ -1,11 +1,12 @@
 import { Canvas } from '@react-three/fiber';
 import { Suspense, useCallback, useRef, useState } from 'react';
 import { Experience } from './components/Experience';
-import { MediaConsole } from './components/MediaConsole';
+import { TutorConsoleStack } from './components/TutorConsoleStack';
 import { SpeechBubbleVisualizer } from './components/SpeechBubbleVisualizer';
 import { Sidebar } from './components/Sidebar';
 import { useVoiceRecorder } from './hooks/useVoiceRecorder';
 import { Message } from './types/message.types';
+import { InterruptButtonState } from './types/tutor.types';
 import styles from './App.module.css';
 
 function LoadingOverlay() {
@@ -39,7 +40,9 @@ export default function App() {
   const [currentMessage, setCurrentMessage] = useState<Message | null>(null);
   const [pttAvailable, setPttAvailable] = useState(false);
   const [tutorSpeaking, setTutorSpeaking] = useState(false);
+  const [interruptState, setInterruptState] = useState<InterruptButtonState>('hidden');
   const audioEndCbRef = useRef<() => void>(() => {});
+  const interruptCbRef = useRef<() => void>(() => {});
 
   const recorder = useVoiceRecorder();
 
@@ -48,6 +51,10 @@ export default function App() {
     audioEndCbRef.current = cb;
   }, []);
   const handleAudioEnd = useCallback(() => audioEndCbRef.current(), []);
+  const registerInterruptCb = useCallback((cb: () => void) => {
+    interruptCbRef.current = cb;
+  }, []);
+  const handleInterrupt = useCallback(() => interruptCbRef.current(), []);
 
   return (
     <div className={styles.app}>
@@ -57,6 +64,8 @@ export default function App() {
         onAudioEndRef={registerAudioEndCb}
         onPttAvailableChange={setPttAvailable}
         onSpeakingChange={setTutorSpeaking}
+        onInterruptRef={registerInterruptCb}
+        onInterruptStateChange={setInterruptState}
       />
 
       <div className={styles.stage}>
@@ -78,7 +87,13 @@ export default function App() {
 
         <SpeechBubbleVisualizer />
 
-        <MediaConsole recorder={recorder} pttAvailable={pttAvailable} speaking={tutorSpeaking} />
+        <TutorConsoleStack
+          recorder={recorder}
+          pttAvailable={pttAvailable}
+          speaking={tutorSpeaking}
+          interruptState={interruptState}
+          onInterrupt={handleInterrupt}
+        />
 
         {!isModelLoaded && <LoadingOverlay />}
       </div>

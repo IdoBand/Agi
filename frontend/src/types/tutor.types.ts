@@ -1,5 +1,7 @@
 export type TutorPhase = 'idle' | 'listening' | 'recording' | 'thinking' | 'speaking';
 
+export type InterruptButtonState = 'hidden' | 'disabled' | 'enabled';
+
 export type TurnEvent =
   | { type: 'transcript'; text: string }
   | { type: 'sentence'; idx: number; hu: string }
