@@ -13,9 +13,9 @@
       "tags": ["citizenship", "ancestry", "language", "hungarian"]
     },
     {
-      "path": "citizenship/mergedQuestions.json",
-      "title": "Citizenship interview — merged bank (ordered + images2)",
-      "summary": "Unified Hungarian citizenship Q&A bank: 189 ordered + 12 unique images2 = 201 entries. Schema {id, question, answer, englishTranslation, category}. Loaders read this file.",
+      "path": "citizenship/orderedMergedQuestions.json",
+      "title": "Citizenship interview — merged bank (ordered + images2, sorted by category)",
+      "summary": "Unified Hungarian citizenship Q&A bank: 191 ordered + 13 images2 = 204 entries. Schema {id, question, answer, englishTranslation, category}. Loaders read this file.",
       "tags": ["citizenship", "interview", "hungarian", "merged"]
     }
   ]

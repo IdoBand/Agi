@@ -6,7 +6,7 @@ import { transcribeAndEvaluate } from './gpt-multi-service/unified-eval.service.
 import { logger } from '../utils/logger.js';
 import { WorkflowContext } from '../utils/file.utils.js';
 
-const QUESTIONS_PATH = path.resolve('knowledge/citizenship/mergedQuestions.json');
+const QUESTIONS_PATH = path.resolve('knowledge/citizenship/orderedMergedQuestions.json');
 const AUDIO_DIR = path.resolve('assets/questionsAudio');
 
 let questionsCache: Question[] | null = null;

@@ -12,7 +12,7 @@ import { logger } from '../utils/logger.js';
 import { Question } from '../types/quiz.types.js';
 
 const BACKEND_ROOT = path.resolve(__dirname, '../..');
-const QUESTIONS_PATH = path.resolve(BACKEND_ROOT, 'knowledge/citizenship/mergedQuestions.json');
+const QUESTIONS_PATH = path.resolve(BACKEND_ROOT, 'knowledge/citizenship/orderedMergedQuestions.json');
 const OUTPUT_DIR = path.resolve(BACKEND_ROOT, 'assets/questionsAudio');
 
 async function main(): Promise<void> {
