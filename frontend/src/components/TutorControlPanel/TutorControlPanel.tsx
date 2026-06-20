@@ -19,30 +19,15 @@ interface TranslateResponse {
   translatedText: string;
 }
 
+interface CategoriesResponse {
+  categories: string[];
+}
+
 const BANK_HINTS: readonly { label: string; say: string }[] = [
   { label: 'Skip question', say: 'say "skip"' },
   { label: 'Skip category', say: 'say "skip category"' },
   { label: 'List topics', say: 'say "what topics"' },
   { label: 'Jump to a topic', say: 'say a topic name or number' },
-];
-
-const BANK_TOPICS: readonly string[] = [
-  'MAGÁRÓL',
-  'CSALÁD',
-  'Tanulás',
-  'Munkahely',
-  'Katonaság',
-  'hobbi',
-  'Tervei',
-  'Utazás',
-  'Nyelvtudás',
-  'Magyarország',
-  'Jogosítvány/ vezetői engedély',
-  'állampolgárság',
-  'Napirend',
-  'Időjárás',
-  'general',
-  'Lakóhely',
 ];
 
 export function TutorControlPanel({ phase, sessionId, transcript, micSelected, bankOnly, onBankOnlyChange, onStart, onBack }: Props) {
@@ -51,7 +36,26 @@ export function TutorControlPanel({ phase, sessionId, transcript, micSelected, b
   const [englishIdxs, setEnglishIdxs] = useState<Set<number>>(new Set());
   const [translations, setTranslations] = useState<Record<number, string>>({});
   const [loadingIdxs, setLoadingIdxs] = useState<Set<number>>(new Set());
+  const [bankTopics, setBankTopics] = useState<string[]>([]);
   const transcriptRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!bankOnly) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/quiz/categories');
+        if (!res.ok) throw new Error(`categories failed: ${res.status}`);
+        const data = (await res.json()) as CategoriesResponse;
+        if (!cancelled) setBankTopics(data.categories);
+      } catch (err) {
+        console.error('[tutor] categories error', err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [bankOnly]);
 
   useEffect(() => {
     if (showHistory && transcriptRef.current) {
@@ -122,7 +126,7 @@ export function TutorControlPanel({ phase, sessionId, transcript, micSelected, b
         {bankOnly && (
           <div className={styles.topics}>
             <span className={styles['topics-title']}>Topics</span>
-            {BANK_TOPICS.map((name, i) => (
+            {bankTopics.map((name, i) => (
               <div className={styles['topic-row']} key={name}>
                 <span className={styles['topic-num']}>{i + 1}</span>
                 <span className={styles['topic-name']}>{name}</span>

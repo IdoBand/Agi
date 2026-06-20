@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { ChatRequest } from '../types/request.types.js';
 import { WorkflowContext, deleteWorkflowDir } from '../utils/file.utils.js';
-import { getRandomQuestions, getShuffledQuestions, evaluateAnswerUnified } from '../services/quiz.service.js';
+import { getRandomQuestions, getShuffledQuestions, evaluateAnswerUnified, getQuizCategories } from '../services/quiz.service.js';
 import { logger } from '../utils/logger.js';
 
 export async function handleQuizStart(
@@ -28,6 +28,20 @@ export async function handleQuizStartTest(
     const questions = await getShuffledQuestions(30);
     res.json({ questions });
   } catch (error) {
+    next(error);
+  }
+}
+
+export async function handleGetCategories(
+  _req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const categories = await getQuizCategories();
+    res.json({ categories });
+  } catch (error) {
+    logger.error('[quiz-categories] error:', error);
     next(error);
   }
 }

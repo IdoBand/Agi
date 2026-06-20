@@ -59,6 +59,17 @@ export async function getAllQuestionMetas(): Promise<Question[]> {
   return all.filter((q) => q.answer.trim().length > 0);
 }
 
+// Unique categories in bank file order; mirrors buildBankCursor in tutor-tools so
+// frontend hint numbering matches the tutor's listTopics exactly.
+export async function getQuizCategories(): Promise<string[]> {
+  const metas = await getAllQuestionMetas();
+  const categories: string[] = [];
+  for (const q of metas) {
+    if (!categories.includes(q.category)) categories.push(q.category);
+  }
+  return categories;
+}
+
 export async function getRandomQuestions(count: number): Promise<QuizQuestion[]> {
   const questions = await loadQuestions();
   const selected = shuffle(questions).slice(0, count);
