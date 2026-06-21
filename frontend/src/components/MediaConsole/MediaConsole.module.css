@@ -43,6 +43,13 @@
   display: inline-flex;
 }
 
+.mic-status {
+  position: absolute;
+  left: -4px;
+  bottom: -4px;
+  pointer-events: none;
+}
+
 .menu {
   position: absolute;
   top: 100%;

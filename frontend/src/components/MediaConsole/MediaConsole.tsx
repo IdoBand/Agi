@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
 import { NoRecordOverlay } from '../NoRecordOverlay';
+import { StatusBadge } from '../StatusBadge';
 import styles from './MediaConsole.module.css';
 
 interface Props {
@@ -61,6 +62,12 @@ export function MediaConsole({ recorder, pttAvailable, speaking }: Props) {
           <span className={styles['mic-icon-wrap']}>
             <MicIcon />
             {speaking && <NoRecordOverlay />}
+            <span className={styles['mic-status']}>
+              <StatusBadge
+                ok={!!recorder.selectedDeviceId}
+                title={recorder.selectedDeviceId ? 'Microphone selected' : 'No microphone selected'}
+              />
+            </span>
           </span>
         </button>
         {open && (

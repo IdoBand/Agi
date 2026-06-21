@@ -1,4 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { useLocalStorage } from './useLocalStorage';
+import { StorageKeys } from '../utils/storage';
 
 interface UseVoiceRecorderReturn {
   isRecording: boolean;
@@ -13,7 +15,10 @@ interface UseVoiceRecorderReturn {
 export function useVoiceRecorder(): UseVoiceRecorderReturn {
   const [isRecording, setIsRecording] = useState(false);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
+  const [selectedDeviceId, setSelectedDeviceId] = useLocalStorage<string | null>(
+    StorageKeys.micDeviceId,
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -37,6 +42,15 @@ export function useVoiceRecorder(): UseVoiceRecorderReturn {
       .then(refreshDevices)
       .catch(() => setError("Microphone access denied."));
   }, [refreshDevices]);
+
+  // Stale-device guard: persisted mic may be unplugged/rotated. Reset to null
+  // so getUserMedia({exact}) doesn't fail on a missing device.
+  useEffect(() => {
+    if (devices.length === 0 || selectedDeviceId === null) return;
+    if (!devices.some((d) => d.deviceId === selectedDeviceId)) {
+      setSelectedDeviceId(null);
+    }
+  }, [devices, selectedDeviceId, setSelectedDeviceId]);
 
   const startRecording = useCallback(async () => {
     try {
