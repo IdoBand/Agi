@@ -26,7 +26,7 @@ interface Props {
 }
 
 export function Sidebar({ recorder, onMessage, onAudioEndRef, onPttAvailableChange, onSpeakingChange, onInterruptRef, onInterruptStateChange }: Props) {
-  const [mode, setMode] = useState<Mode>('quiz');
+  const [mode, setMode] = useState<Mode>('tutor');
   const [sessionActive, setSessionActive] = useState(false);
 
   return (

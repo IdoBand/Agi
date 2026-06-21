@@ -60,7 +60,7 @@ export function useTutorChat(
   onInterruptStateChange?: (s: InterruptButtonState) => void,
 ): UseTutorChatReturn {
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [bankOnly, setBankOnly] = useState<boolean>(false);
+  const [bankOnly, setBankOnly] = useState<boolean>(true);
   const [phase, setPhase] = useState<TutorPhase>('idle');
   const [currentMessage, setCurrentMessage] = useState<Message | null>(null);
   const [transcript, setTranscript] = useState<TutorTranscriptEntry[]>([]);
