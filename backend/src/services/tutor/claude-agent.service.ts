@@ -188,6 +188,44 @@ function chunkTextContent(content: unknown): string {
   return '';
 }
 
+// Narrow shape of the fused evaluateAndDraw* tool args, used only to detect a
+// silent redundancy re-draw (a step that skips a question without recording an
+// evaluation). Kept loose (optional/unknown-ish) since it parses raw event args.
+interface EvaluateAndDrawArgs {
+  evaluation?: { topic?: string; correct?: boolean; note?: string } | null;
+  draw?: { skip?: string; jumpToTopic?: string } | null;
+}
+
+// The tool args arrive on the event stream either directly
+// (`{ draw: {...}, evaluation: {...} }`) or nested+stringified
+// (`ev.data.input = { input: '{"draw":{"skip":"question"}}' }`, seen in debug.log).
+// Unwrap defensively: if `.input` is a string, JSON.parse it; else use the value as-is.
+function parseEvaluateAndDrawArgs(input: unknown): EvaluateAndDrawArgs | null {
+  if (typeof input !== 'object' || input === null) return null;
+  const nested = (input as { input?: unknown }).input;
+  let raw: unknown = input;
+  if (typeof nested === 'string') {
+    try {
+      raw = JSON.parse(nested);
+    } catch {
+      return null;
+    }
+  }
+  if (typeof raw !== 'object' || raw === null) return null;
+  return raw as EvaluateAndDrawArgs;
+}
+
+// Silent-re-draw predicate (matches the tool schema: top-level `evaluation?` + `draw?`):
+// a draw that skips the current question with no evaluation recorded. This is the
+// turn shape whose narration ("Redundant — skipping silently.") must never be spoken.
+function isSilentReDraw(input: unknown): boolean {
+  const args = parseEvaluateAndDrawArgs(input);
+  if (!args) return false;
+  const draw = args.draw;
+  const hasQuestionSkip = typeof draw === 'object' && draw !== null && draw.skip === 'question';
+  return hasQuestionSkip && args.evaluation == null;
+}
+
 export interface SentenceEvent {
   idx: number;
   hu: string;
@@ -253,6 +291,22 @@ export async function* runTurnStream(
     }
   };
 
+  // Per-step (per-LLM-call) gating. Step #1 streams live (latency-critical first
+  // audio; a silent re-draw structurally can't occur in call #1). Steps #2+ are
+  // buffered until their tool call is seen: a silent re-draw drops the buffered
+  // text (rolled back out of assistantText), anything else flushes it.
+  let firstCallCommitted = false;
+  let stepIsLive = false;
+  let stepBuffer = '';
+  let stepRollbackMark = 0;
+
+  const flushStepBuffer = (): void => {
+    if (!stepBuffer) return;
+    buffer += stepBuffer;
+    stepBuffer = '';
+    flushFromBuffer();
+  };
+
   try {
     const stream = agent.streamEvents(
       { messages: [new HumanMessage(userText)] },
@@ -273,13 +327,27 @@ export async function* runTurnStream(
         const text = chunkTextContent(chunk?.content);
         if (text) {
           assistantText += text;
-          buffer += text;
-          flushFromBuffer();
+          if (stepIsLive) {
+            // Step #1: stream live (preserve first-audio latency).
+            buffer += text;
+            flushFromBuffer();
+          } else {
+            // Steps #2+: hold until the step's tool call decides drop vs flush.
+            stepBuffer += text;
+          }
         }
       } else if (ev.event === 'on_chat_model_start') {
+        // A non-live step that buffered text but issued no tool call is a
+        // final-answer step; flush it before the next call's state resets.
+        if (!stepIsLive) flushStepBuffer();
         sonnetCalls += 1;
+        // Step #1 streams live; every subsequent step is buffered & gated.
+        stepIsLive = !firstCallCommitted;
+        firstCallCommitted = true;
+        stepBuffer = '';
+        stepRollbackMark = assistantText.length;
         llmStartByRunId.set(ev.run_id, Date.now());
-        logger.debug(`[tutor-agent] ${logTag} llm_call_start #${sonnetCalls}`);
+        logger.debug(`[tutor-agent] ${logTag} llm_call_start #${sonnetCalls} live=${stepIsLive}`);
       } else if (ev.event === 'on_chat_model_end') {
         const out = (ev.data as { output?: { usage_metadata?: UsageMetadata } }).output;
         const usage = out?.usage_metadata;
@@ -303,6 +371,21 @@ export async function* runTurnStream(
         );
       } else if (ev.event === 'on_tool_start') {
         const input = (ev.data as { input?: unknown }).input;
+        // Resolve the buffered step's text now that we can see its tool args.
+        if (!stepIsLive) {
+          if (isSilentReDraw(input)) {
+            // Drop the silent-re-draw narration: discard buffered text and roll
+            // assistantText back so the persisted reply stays consistent.
+            assistantText = assistantText.slice(0, stepRollbackMark);
+            const dropped = stepBuffer.length;
+            stepBuffer = '';
+            logger.debug(`[tutor-agent] ${logTag} step_text_dropped chars=${dropped}`);
+          } else {
+            const flushed = stepBuffer.length;
+            flushStepBuffer();
+            logger.debug(`[tutor-agent] ${logTag} step_text_flushed chars=${flushed}`);
+          }
+        }
         const tc: ToolCallTrace = { name: ev.name, input };
         toolCalls.push(tc);
         toolByRunId.set(ev.run_id, tc);
@@ -349,6 +432,12 @@ export async function* runTurnStream(
       logger.error(`[tutor-agent] ${logTag} turn_error status=${err.status ?? '-'} stack=${err.stack ?? String(e)}`);
     }
     throw e;
+  }
+
+  // A final-answer step (text, no tool call) leaves text in stepBuffer; flush it.
+  if (!stepIsLive) flushStepBuffer();
+  while (pending.length > 0) {
+    yield pending.shift()!;
   }
 
   const tail = buffer.trim();
