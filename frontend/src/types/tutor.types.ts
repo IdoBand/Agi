@@ -13,4 +13,5 @@ export interface TutorTranscriptEntry {
   text: string;
   textEn?: string;
   at: number;
+  audio?: string[]; // base64 MP3 chunks retained for replay (assistant only)
 }

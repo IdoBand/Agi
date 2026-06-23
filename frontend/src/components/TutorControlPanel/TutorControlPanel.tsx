@@ -13,6 +13,22 @@ interface Props {
   onBankOnlyChange: (v: boolean) => void;
   onStart: () => void;
   onBack: () => void;
+  onReplay: (i: number, chunks: string[]) => void;
+  replayingIdx: number | null;
+}
+
+function SpeakerIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={styles['speaker-icon']}
+    >
+      <polygon points="3,9 7,9 12,4 12,20 7,15 3,15" />
+      <path d="M16 8a5 5 0 0 1 0 8" fill="none" stroke="currentColor" strokeWidth="2" />
+    </svg>
+  );
 }
 
 interface TranslateResponse {
@@ -30,7 +46,7 @@ const BANK_HINTS: readonly { label: string; say: string }[] = [
   { label: 'Jump to a topic', say: 'say a topic name or number' },
 ];
 
-export function TutorControlPanel({ phase, sessionId, transcript, micSelected, bankOnly, onBankOnlyChange, onStart, onBack }: Props) {
+export function TutorControlPanel({ phase, sessionId, transcript, micSelected, bankOnly, onBankOnlyChange, onStart, onBack, onReplay, replayingIdx }: Props) {
   const [showHistory, setShowHistory] = useState(true);
   const [hideTutor, setHideTutor] = useState(false);
   const [englishIdxs, setEnglishIdxs] = useState<Set<number>>(new Set());
@@ -173,7 +189,7 @@ export function TutorControlPanel({ phase, sessionId, transcript, micSelected, b
                 <div className={`${styles.bar} animate-bounce`} />
                 <div className={`${styles.bar} animate-bounce`} />
               </div>
-              <span className={styles.label}>Speaking...</span>
+              <span className={styles.label}>{replayingIdx !== null ? 'Replaying...' : 'Speaking...'}</span>
             </div>
           )}
         </div>
@@ -200,6 +216,24 @@ export function TutorControlPanel({ phase, sessionId, transcript, micSelected, b
                 className={`${styles.bubble} ${m.role === 'user' ? styles['bubble--user'] : styles['bubble--assistant']}`}
               >
                 <span className={styles.role}>{m.role === 'user' ? 'You:' : 'Tutor:'}</span>
+                {isAssistant && m.audio?.length ? (
+                  <button
+                    type="button"
+                    onClick={() => onReplay(i, m.audio ?? [])}
+                    className={`${styles.speaker} ${replayingIdx === i ? styles['speaker--active'] : ''}`}
+                    disabled={phase === 'speaking' || !m.audio?.length}
+                    aria-label={replayingIdx === i ? 'Replaying message' : 'Replay message'}
+                    title={
+                      phase === 'speaking'
+                        ? replayingIdx === i
+                          ? 'Replaying…'
+                          : 'Tutor is speaking…'
+                        : 'Replay message'
+                    }
+                  >
+                    <SpeakerIcon />
+                  </button>
+                ) : null}
                 {isAssistant && m.text && (
                   <button
                     onClick={() => toggleLang(i, m.text)}

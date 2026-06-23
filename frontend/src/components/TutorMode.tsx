@@ -55,6 +55,8 @@ export function TutorMode({ recorder, onMessage, onAudioEndRef, onPttAvailableCh
       onBankOnlyChange={tutor.setBankOnly}
       onStart={tutor.startSession}
       onBack={tutor.resetSession}
+      onReplay={tutor.replayMessage}
+      replayingIdx={tutor.replayingIdx}
     />
   );
 }

@@ -22,6 +22,8 @@ export interface UseTutorChatReturn {
   resetSession: () => Promise<void>;
   onAssistantAudioEnd: () => void;
   interrupt: () => void;
+  replayMessage: (i: number, chunks: string[]) => void;
+  replayingIdx: number | null;
 }
 
 function newSessionId(): string {
@@ -65,12 +67,27 @@ export function useTutorChat(
   const [currentMessage, setCurrentMessage] = useState<Message | null>(null);
   const [transcript, setTranscript] = useState<TutorTranscriptEntry[]>([]);
   const [turnDone, setTurnDone] = useState<boolean>(false);
+  const [replayingIdx, setReplayingIdx] = useState<number | null>(null);
   const inFlightRef = useRef<AbortController | null>(null);
   const audioQueueRef = useRef<string[]>([]);
   const playingRef = useRef<boolean>(false);
   const turnDoneRef = useRef<boolean>(false);
+  const replayingIdxRef = useRef<number | null>(null);
+  const phaseRef = useRef<TutorPhase>('idle');
+  const playSeqRef = useRef<number>(0);
 
   const { isRecording, selectedDeviceId, startRecording, stopRecording } = recorder;
+
+  // Mirror phase into a ref so replay guards can read it without stale closures.
+  useEffect(() => {
+    phaseRef.current = phase;
+  }, [phase]);
+
+  // Write both the ref and the state so reads never observe a half-updated value.
+  const setReplaying = useCallback((idx: number | null) => {
+    replayingIdxRef.current = idx;
+    setReplayingIdx(idx);
+  }, []);
 
   const startSession = useCallback(() => {
     setSessionId(newSessionId());
@@ -78,8 +95,9 @@ export function useTutorChat(
     setCurrentMessage(null);
     turnDoneRef.current = false;
     setTurnDone(false);
+    setReplaying(null);
     setPhase('listening');
-  }, []);
+  }, [setReplaying]);
 
   const resetSession = useCallback(async () => {
     if (inFlightRef.current) {
@@ -101,11 +119,12 @@ export function useTutorChat(
     playingRef.current = false;
     turnDoneRef.current = false;
     setTurnDone(false);
+    setReplaying(null);
     setSessionId(null);
     setTranscript([]);
     setCurrentMessage(null);
     setPhase('idle');
-  }, [sessionId]);
+  }, [sessionId, setReplaying]);
 
   const interrupt = useCallback(() => {
     if (!turnDoneRef.current) return;
@@ -113,14 +132,23 @@ export function useTutorChat(
     playingRef.current = false;
     turnDoneRef.current = false;
     setTurnDone(false);
+    setReplaying(null);
     setCurrentMessage(null);
     setPhase('listening');
-  }, []);
+  }, [setReplaying]);
 
   const playNext = useCallback(() => {
     const next = audioQueueRef.current.shift();
     if (!next) {
       playingRef.current = false;
+      // Fix B: a replay has no streaming producer, so an empty queue means it
+      // finished — finalize unconditionally before the live turnDone branch.
+      if (replayingIdxRef.current !== null) {
+        setReplaying(null);
+        setCurrentMessage(null);
+        setPhase('listening');
+        return;
+      }
       if (turnDoneRef.current) {
         setCurrentMessage(null);
         setPhase('listening');
@@ -128,8 +156,10 @@ export function useTutorChat(
       return;
     }
     playingRef.current = true;
-    setCurrentMessage({ role: 'assistant', content: '', audio: next });
-  }, []);
+    // Fix A: stamp a fresh playId so the Avatar re-runs its effect even when two
+    // consecutive sentences produced byte-identical base64.
+    setCurrentMessage({ role: 'assistant', content: '', audio: next, playId: ++playSeqRef.current });
+  }, [setReplaying]);
 
   const enqueueAudio = useCallback(
     (base64: string) => {
@@ -147,6 +177,28 @@ export function useTutorChat(
     playNext();
   }, [playNext]);
 
+  // Replay a finished assistant message by feeding its retained chunks back
+  // through the existing queue/Avatar pipeline. `chunks` is passed in to avoid a
+  // stale `transcript` closure.
+  const replayMessage = useCallback(
+    (i: number, chunks: string[]) => {
+      if (phaseRef.current !== 'listening') return;
+      if (replayingIdxRef.current !== null) return;
+      if (!chunks?.length) return;
+      // User gesture (button click): wake the WebAudio graph, mirroring T-key.
+      ensureAudioContextRunning();
+      audioQueueRef.current = [...chunks];
+      playingRef.current = false;
+      // Treat replay like a completed-stream speaking turn (interrupt + N work).
+      turnDoneRef.current = true;
+      setTurnDone(true);
+      setReplaying(i);
+      setPhase('speaking');
+      playNext();
+    },
+    [playNext, setReplaying]
+  );
+
   const sendTurn = useCallback(
     async (blob: Blob, sid: string) => {
       if (inFlightRef.current) inFlightRef.current.abort();
@@ -156,6 +208,7 @@ export function useTutorChat(
       playingRef.current = false;
       turnDoneRef.current = false;
       setTurnDone(false);
+      setReplaying(null);
       setPhase('thinking');
 
       const turnAt = Date.now();
@@ -208,7 +261,21 @@ export function useTutorChat(
                 return next;
               });
             } else if (payload.type === 'audio') {
-              enqueueAudio(payload.base64);
+              const chunk = payload.base64;
+              // Retain the chunk on the latest assistant entry for replay. Guard
+              // against out-of-order events: skip if the tail isn't assistant.
+              setTranscript((t) => {
+                const next = [...t];
+                for (let i = next.length - 1; i >= 0; i--) {
+                  if (next[i].role === 'assistant') {
+                    next[i] = { ...next[i], audio: [...(next[i].audio ?? []), chunk] };
+                    break;
+                  }
+                  if (next[i].role === 'user') break;
+                }
+                return next;
+              });
+              enqueueAudio(chunk);
             } else if (payload.type === 'done') {
               turnDoneRef.current = true;
               setTurnDone(true);
@@ -240,6 +307,7 @@ export function useTutorChat(
         playingRef.current = false;
         turnDoneRef.current = false;
         setTurnDone(false);
+        setReplaying(null);
         setCurrentMessage(null);
         setPhase('listening');
       } finally {
@@ -248,7 +316,7 @@ export function useTutorChat(
         void assistantText;
       }
     },
-    [enqueueAudio, bankOnly]
+    [enqueueAudio, bankOnly, setReplaying]
   );
 
   useEffect(() => {
@@ -334,5 +402,7 @@ export function useTutorChat(
     resetSession,
     onAssistantAudioEnd,
     interrupt,
+    replayMessage,
+    replayingIdx,
   };
 }

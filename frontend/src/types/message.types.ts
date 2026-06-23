@@ -12,4 +12,5 @@ export interface Message {
   content: string;
   audio?: string;
   facialExpression?: FacialExpression;
+  playId?: number; // monotonic nonce so identical consecutive base64 still re-triggers playback
 }

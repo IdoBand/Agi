@@ -14,6 +14,7 @@ import {
 export function Avatar({
   modelUrl,
   audio,
+  playId,
   facialExpression = 'default',
   onAudioEnd,
   position = [0, -1.5, 0],
@@ -93,7 +94,8 @@ export function Avatar({
       }
       sourceNodeRef.current = null;
     };
-  }, [audio, onAudioEnd]);
+    // playId re-triggers playback when consecutive chunks are byte-identical.
+  }, [audio, playId, onAudioEnd]);
 
   // Smooth morph target transitions - applies to ALL meshes with morph targets
   const lerpMorphTarget = (target: string, value: number, speed: number) => {

@@ -244,6 +244,39 @@
   background: var(--color-surface-translucent-hover);
 }
 
+.speaker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  border: none;
+  cursor: pointer;
+  background: var(--color-surface-translucent);
+  color: var(--color-text-secondary);
+  margin-left: 0.25rem;
+  margin-right: 0;
+  vertical-align: middle;
+}
+.speaker:hover:not(:disabled) {
+  background: var(--color-surface-translucent-hover);
+}
+.speaker:disabled {
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+/* Wins over .speaker:disabled (same specificity, declared later) so the
+   actively-replaying button keeps its accent while disabled. */
+.speaker.speaker--active {
+  color: var(--color-accent-selected);
+}
+
+.speaker-icon {
+  width: 0.75rem;
+  height: 0.75rem;
+  display: block;
+}
+
 .translating {
   display: inline-flex;
   align-items: center;
