@@ -1,8 +1,8 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-import { config } from '../../config/index.js';
 import { logger } from '../../utils/logger.js';
 import { ToolCallTrace, TurnTrace } from '../../types/tutor.types.js';
+import { llmProvider } from './providers/llm-provider.factory.js';
 
 const TRACE_DIR = path.resolve('logs/tutor-sessions');
 const headerWritten = new Set<string>();
@@ -39,7 +39,7 @@ function renderTurn(t: TurnTrace): string {
   if (t.llmUsage) {
     const u = t.llmUsage;
     lines.push(
-      `**LLM:** ${u.sonnetCalls} Sonnet call${u.sonnetCalls === 1 ? '' : 's'} · ${formatNum(u.inputTokens)} in / ${formatNum(u.outputTokens)} out tokens`,
+      `**LLM:** ${u.sonnetCalls} LLM call${u.sonnetCalls === 1 ? '' : 's'} · ${formatNum(u.inputTokens)} in / ${formatNum(u.outputTokens)} out tokens`,
     );
   }
   if (t.toolCalls.length > 0) {
@@ -61,7 +61,7 @@ async function writeHeaderIfNeeded(sessionId: string): Promise<void> {
   } catch {
     // file does not exist; write header
   }
-  const header = `# Tutor session ${sessionId}\nstarted: ${new Date().toISOString()}\nmodel: ${config.anthropic.model}\n\n`;
+  const header = `# Tutor session ${sessionId}\nstarted: ${new Date().toISOString()}\nprovider: ${llmProvider.name}\nmodel: ${llmProvider.model}\n\n`;
   await fs.writeFile(fp, header, 'utf8');
   headerWritten.add(sessionId);
 }

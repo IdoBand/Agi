@@ -10,6 +10,12 @@ function parseSTTProvider(value: string | undefined): STTProvider {
   return 'whisper';
 }
 
+export type LLMProvider = 'anthropic' | 'openai';
+
+function parseLLMProvider(value: string | undefined): LLMProvider {
+  return value === 'openai' ? 'openai' : 'anthropic';
+}
+
 export type TutorPromptVariant = 'baseline' | 'bilingual';
 
 function parsePromptVariant(value: string | undefined): TutorPromptVariant {
@@ -47,6 +53,14 @@ export const config = {
   anthropic: {
     apiKey: process.env.ANTHROPIC_API_KEY || '',
     model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6',
+  },
+
+  // Tutor LLM provider selection. Flip LLM_PROVIDER=openai (and set OPENAI_API_KEY)
+  // to run tutor mode on OpenAI; defaults to anthropic. openaiModel is dedicated to
+  // the tutor (independent of the quiz/STT OpenAI usage).
+  llm: {
+    provider: parseLLMProvider(process.env.LLM_PROVIDER),
+    openaiModel: process.env.LLM_OPENAI_MODEL || 'gpt-5-mini',
   },
 
   googleTranslate: {

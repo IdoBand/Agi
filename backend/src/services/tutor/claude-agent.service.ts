@@ -1,17 +1,17 @@
 import { randomUUID } from 'crypto';
 import { AsyncLocalStorage } from 'async_hooks';
-import { ChatAnthropic } from '@langchain/anthropic';
 import { createReactAgent } from '@langchain/langgraph/prebuilt';
 import { MemorySaver } from '@langchain/langgraph';
-import { HumanMessage, SystemMessage } from '@langchain/core/messages';
+import { HumanMessage } from '@langchain/core/messages';
 import type { UsageMetadata } from '@langchain/core/messages';
-import { config } from '../../config/index.js';
+import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { logger } from '../../utils/logger.js';
 import { ACTIVE_CITIZENSHIP_INTERVIEW_PROMPT, CITIZENSHIP_INTERVIEW_PROMPT_BANK_ONLY } from './system-prompt.js';
 import { buildTutorTools, buildBankOnlyTutorTools, dropEvalLog, dropAskedQuestions, dropBankCursor } from './tutor-tools.js';
 import { ToolCallTrace, TurnTrace } from '../../types/tutor.types.js';
 import { TurnLlmUsage, asAnthropicError, isRateLimitError, getRetryAfter } from '../../types/anthropic.types.js';
 import { appendTurnTrace, rotateSessionTrace } from './session-trace.js';
+import { llmProvider } from './providers/llm-provider.factory.js';
 
 /**
  * Per-turn correlation context made available to the singleton model's
@@ -93,34 +93,24 @@ interface SessionState {
 const sessions = new Map<string, SessionState>();
 const SESSION_TTL_MS = 60 * 60 * 1000;
 
-// Static prefix (system + tool schemas) is identical across every turn, so we
-// mark a single ephemeral cache breakpoint on the system block. Anthropic caches
-// the whole tools→system prefix; subsequent Sonnet calls read it instead of
-// re-sending ~3.6k tokens uncached. createReactAgent prepends this SystemMessage
-// verbatim each turn; per-block cache_control survives into the Anthropic payload.
-// (Confirm via the cacheRead/cacheWrite fields on llm_call_end — caching of the
-// tools block is server-side prefix behavior, not a LangChain guarantee.)
-const BANK_ONLY_SYSTEM_MESSAGE = new SystemMessage({
-  content: [{ type: 'text', text: CITIZENSHIP_INTERVIEW_PROMPT_BANK_ONLY, cache_control: { type: 'ephemeral' } }],
-});
-const ACTIVE_SYSTEM_MESSAGE = new SystemMessage({
-  content: [{ type: 'text', text: ACTIVE_CITIZENSHIP_INTERVIEW_PROMPT, cache_control: { type: 'ephemeral' } }],
-});
+// Static prefix (system + tool schemas) is identical across every turn. The active
+// provider decides how to build the system message: the Anthropic provider marks an
+// ephemeral cache breakpoint on the system block (so the tools→system prefix is read
+// from cache on subsequent calls instead of re-sending ~3.6k tokens), while the
+// OpenAI provider sends plain system text (its caching is automatic/server-side).
+// createReactAgent prepends this SystemMessage verbatim each turn. Confirm Anthropic
+// caching via the cacheRead/cacheWrite fields on llm_call_end.
+const BANK_ONLY_SYSTEM_MESSAGE = llmProvider.buildSystemMessage(CITIZENSHIP_INTERVIEW_PROMPT_BANK_ONLY);
+const ACTIVE_SYSTEM_MESSAGE = llmProvider.buildSystemMessage(ACTIVE_CITIZENSHIP_INTERVIEW_PROMPT);
 
 const FALLBACK_HU = 'Bocsánat, nem hallottam jól. Mondanád újra?';
 
 const checkpointer = new MemorySaver();
-let chatModel: ChatAnthropic | null = null;
+let chatModel: BaseChatModel | null = null;
 
-function getChatModel(): ChatAnthropic {
+function getChatModel(): BaseChatModel {
   if (!chatModel) {
-    chatModel = new ChatAnthropic({
-      model: config.anthropic.model,
-      apiKey: config.anthropic.apiKey,
-      streaming: true,
-      maxRetries: 6,
-      onFailedAttempt: logFailedAttempt,
-    });
+    chatModel = llmProvider.createModel(logFailedAttempt);
   }
   return chatModel;
 }
@@ -151,9 +141,7 @@ function sweep(): void {
 }
 
 function ensureInit(): void {
-  if (!config.anthropic.apiKey) {
-    throw new Error('ANTHROPIC_API_KEY is not set; tutor mode unavailable.');
-  }
+  llmProvider.ensureConfigured();
 }
 
 const SENTENCE_BOUNDARY = /([^.!?…\n]+[.!?…]+|\S[^\n]*\n)/g;
@@ -350,24 +338,17 @@ export async function* runTurnStream(
         logger.debug(`[tutor-agent] ${logTag} llm_call_start #${sonnetCalls} live=${stepIsLive}`);
       } else if (ev.event === 'on_chat_model_end') {
         const out = (ev.data as { output?: { usage_metadata?: UsageMetadata } }).output;
-        const usage = out?.usage_metadata;
-        const inT = usage?.input_tokens ?? 0;
-        const outT = usage?.output_tokens ?? 0;
-        // input_tokens already folds in cache_read + cache_creation; these split it
-        // out so the prompt cache is observable (cacheWrite on first call of a
-        // session, cacheRead on every subsequent call).
-        const cacheDetails = usage?.input_token_details as
-          | { cache_read?: number; cache_creation?: number }
-          | undefined;
-        const cacheRead = cacheDetails?.cache_read ?? 0;
-        const cacheWrite = cacheDetails?.cache_creation ?? 0;
-        inputTokens += inT;
-        outputTokens += outT;
+        // Provider normalizes usage across Anthropic/OpenAI. input_tokens already
+        // folds in cached tokens; the split makes the prompt cache observable
+        // (Anthropic reports cacheRead+cacheWrite; OpenAI reports cacheRead only).
+        const u = llmProvider.parseUsage(out?.usage_metadata);
+        inputTokens += u.inputTokens;
+        outputTokens += u.outputTokens;
         const startedLlm = llmStartByRunId.get(ev.run_id);
         llmStartByRunId.delete(ev.run_id);
         const latencyMs = startedLlm !== undefined ? Date.now() - startedLlm : -1;
         logger.debug(
-          `[tutor-agent] ${logTag} llm_call_end in=${inT} out=${outT} cacheRead=${cacheRead} cacheWrite=${cacheWrite} latencyMs=${latencyMs}`,
+          `[tutor-agent] ${logTag} llm_call_end in=${u.inputTokens} out=${u.outputTokens} cacheRead=${u.cacheRead} cacheWrite=${u.cacheWrite} latencyMs=${latencyMs}`,
         );
       } else if (ev.event === 'on_tool_start') {
         const input = (ev.data as { input?: unknown }).input;
