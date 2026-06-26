@@ -4,7 +4,7 @@
   cursor: pointer;
   user-select: none;
 }
-.blur:hover {
+.bubble:hover .blur {
   filter: blur(0);
   user-select: text;
   cursor: auto;
