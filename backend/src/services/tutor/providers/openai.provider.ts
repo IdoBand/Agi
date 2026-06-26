@@ -1,5 +1,5 @@
 import { ChatOpenAI } from '@langchain/openai';
-import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import type { LanguageModelLike } from '@langchain/core/language_models/base';
 import { SystemMessage } from '@langchain/core/messages';
 import type { UsageMetadata } from '@langchain/core/messages';
 import { config } from '../../../config/index.js';
@@ -9,7 +9,7 @@ class OpenAIProvider implements ILlmProvider {
   readonly name: LLMProvider = 'openai';
   readonly model: string = config.llm.openaiModel;
 
-  createModel(onFailedAttempt: (error: unknown) => void): BaseChatModel {
+  createModel(onFailedAttempt: (error: unknown) => void): LanguageModelLike {
     return new ChatOpenAI({
       model: config.llm.openaiModel,
       apiKey: config.openai.apiKey,

@@ -1,4 +1,4 @@
-import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import type { LanguageModelLike } from '@langchain/core/language_models/base';
 import type { SystemMessage, UsageMetadata } from '@langchain/core/messages';
 
 export type LLMProvider = 'anthropic' | 'openai';
@@ -23,7 +23,7 @@ export interface ILlmProvider {
   /** Resolved model string in use (for logging / session traces). */
   readonly model: string;
   /** Build the streaming chat model, wired with the per-turn retry-log callback. */
-  createModel(onFailedAttempt: (error: unknown) => void): BaseChatModel;
+  createModel(onFailedAttempt: (error: unknown) => void): LanguageModelLike;
   /** Build the system message for a prompt (Anthropic adds an ephemeral cache breakpoint; OpenAI sends plain text). */
   buildSystemMessage(promptText: string): SystemMessage;
   /** Normalize `usage_metadata` from an `on_chat_model_end` event. */

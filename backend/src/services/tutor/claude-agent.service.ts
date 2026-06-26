@@ -4,7 +4,7 @@ import { createReactAgent } from '@langchain/langgraph/prebuilt';
 import { MemorySaver } from '@langchain/langgraph';
 import { HumanMessage } from '@langchain/core/messages';
 import type { UsageMetadata } from '@langchain/core/messages';
-import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import type { LanguageModelLike } from '@langchain/core/language_models/base';
 import { logger } from '../../utils/logger.js';
 import { ACTIVE_CITIZENSHIP_INTERVIEW_PROMPT, CITIZENSHIP_INTERVIEW_PROMPT_BANK_ONLY } from './system-prompt.js';
 import { buildTutorTools, buildBankOnlyTutorTools, dropEvalLog, dropAskedQuestions, dropBankCursor } from './tutor-tools.js';
@@ -106,9 +106,9 @@ const ACTIVE_SYSTEM_MESSAGE = llmProvider.buildSystemMessage(ACTIVE_CITIZENSHIP_
 const FALLBACK_HU = 'Bocsánat, nem hallottam jól. Mondanád újra?';
 
 const checkpointer = new MemorySaver();
-let chatModel: BaseChatModel | null = null;
+let chatModel: LanguageModelLike | null = null;
 
-function getChatModel(): BaseChatModel {
+function getChatModel(): LanguageModelLike {
   if (!chatModel) {
     chatModel = llmProvider.createModel(logFailedAttempt);
   }

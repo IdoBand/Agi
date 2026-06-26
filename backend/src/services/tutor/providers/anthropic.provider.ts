@@ -1,5 +1,5 @@
 import { ChatAnthropic } from '@langchain/anthropic';
-import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import type { LanguageModelLike } from '@langchain/core/language_models/base';
 import { SystemMessage } from '@langchain/core/messages';
 import type { UsageMetadata } from '@langchain/core/messages';
 import { config } from '../../../config/index.js';
@@ -9,14 +9,19 @@ class AnthropicProvider implements ILlmProvider {
   readonly name: LLMProvider = 'anthropic';
   readonly model: string = config.anthropic.model;
 
-  createModel(onFailedAttempt: (error: unknown) => void): BaseChatModel {
+  createModel(onFailedAttempt: (error: unknown) => void): LanguageModelLike {
+    // Moving tail breakpoint: the top-level cache_control call option tells the API
+    // to put an ephemeral breakpoint on the last cacheable block and advance it as
+    // the conversation grows, so the whole prefix (system + tools + prior turns) is
+    // read from cache instead of re-billed each call. Pairs with the static
+    // system-block breakpoint in buildSystemMessage (2 breakpoints, within the limit).
     return new ChatAnthropic({
       model: config.anthropic.model,
       apiKey: config.anthropic.apiKey,
       streaming: true,
       maxRetries: 6,
       onFailedAttempt,
-    });
+    }).withConfig({ cache_control: { type: 'ephemeral' } });
   }
 
   buildSystemMessage(promptText: string): SystemMessage {
