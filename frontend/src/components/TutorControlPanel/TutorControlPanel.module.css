@@ -176,20 +176,6 @@
   font-weight: 500;
 }
 
-.bars {
-  display: flex;
-  gap: 0.25rem;
-}
-
-.bar {
-  width: 0.25rem;
-  height: 1rem;
-  background: var(--color-text-primary);
-}
-.bar:nth-child(1) { animation-delay: 0ms; }
-.bar:nth-child(2) { animation-delay: 150ms; }
-.bar:nth-child(3) { animation-delay: 300ms; }
-
 /* Transcript */
 .transcript {
   flex: 1;

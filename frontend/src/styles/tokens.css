@@ -31,6 +31,11 @@
   --color-error-text: #f87171;                       /* red-400 */
   --color-error-surface: rgba(220, 38, 38, 0.2);     /* red-600/20 */
 
+  /* Flag colors (TricolorSpinner variants) */
+  --flag-hu-red: #cd2a3e;                            /* Hungarian flag red */
+  --flag-hu-white: #ffffff;                          /* Hungarian flag white */
+  --flag-hu-green: #436f4d;                           /* Hungarian flag green */
+
   /* Translucent surfaces (tutor transcript) */
   --color-bubble-user: rgba(29, 78, 216, 0.4);       /* blue-700/40, user bubble */
   --color-bubble-user-text: #dbeafe;                 /* blue-100, user bubble text */
@@ -78,6 +83,16 @@
     animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
   }
 }
+@keyframes bounceX {
+  0%, 100% {
+    transform: translateX(-25%);
+    animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+  }
+  50% {
+    transform: none;
+    animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  }
+}
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
@@ -90,5 +105,6 @@
 /* Global animation utilities */
 .animate-spin { animation: spin 1s linear infinite; }
 .animate-bounce { animation: bounce 1s infinite; }
+.animate-bounceX { animation: bounceX 1s infinite; }
 .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
 .animate-fadeIn { animation: fadeIn 200ms ease-in; }

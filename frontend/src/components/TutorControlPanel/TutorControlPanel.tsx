@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { TutorPhase, TutorTranscriptEntry } from '../../types/tutor.types';
 import { ToggleSetting } from '../ToggleSetting/ToggleSetting';
 import { BackButton } from '../BackButton';
+import { TricolorSpinner } from '../TricolorSpinner';
 import styles from './TutorControlPanel.module.css';
 
 interface Props {
@@ -184,11 +185,7 @@ export function TutorControlPanel({ phase, sessionId, transcript, micSelected, b
           )}
           {phase === 'speaking' && (
             <div className={styles['status-row']}>
-              <div className={styles.bars}>
-                <div className={`${styles.bar} animate-bounce`} />
-                <div className={`${styles.bar} animate-bounce`} />
-                <div className={`${styles.bar} animate-bounce`} />
-              </div>
+              <TricolorSpinner variant="hungary" />
               <span className={styles.label}>{replayingIdx !== null ? 'Replaying...' : 'Speaking...'}</span>
             </div>
           )}

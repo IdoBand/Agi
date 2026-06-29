@@ -1,3 +1,4 @@
+import { TricolorSpinner } from '../TricolorSpinner';
 import styles from './PushToTalk.module.css';
 
 interface PushToTalkProps {
@@ -44,11 +45,7 @@ export function PushToTalk({
           {isRecording && <div className={`${styles['rec-dot']} animate-pulse`} />}
           {isLoading && <div className={`${styles.spinner} animate-spin`} />}
           {isPlaying && (
-            <div className={styles.bars}>
-              <div className={`${styles.bar} animate-bounce`} />
-              <div className={`${styles.bar} animate-bounce`} />
-              <div className={`${styles.bar} animate-bounce`} />
-            </div>
+            <TricolorSpinner variant="hungary" />
           )}
           <span className={styles.label}>{getStatusText()}</span>
         </div>
