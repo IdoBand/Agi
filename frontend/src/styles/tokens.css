@@ -34,7 +34,7 @@
   /* Flag colors (TricolorSpinner variants) */
   --flag-hu-red: #cd2a3e;                            /* Hungarian flag red */
   --flag-hu-white: #ffffff;                          /* Hungarian flag white */
-  --flag-hu-green: #436f4d;                           /* Hungarian flag green */
+  --flag-hu-green: #5c9468;                           /* Hungarian flag green */
 
   /* Translucent surfaces (tutor transcript) */
   --color-bubble-user: rgba(29, 78, 216, 0.4);       /* blue-700/40, user bubble */
