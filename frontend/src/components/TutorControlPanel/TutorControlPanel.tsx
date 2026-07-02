@@ -212,7 +212,7 @@ export function TutorControlPanel({ phase, sessionId, transcript, micSelected, b
                 key={i}
                 className={`${styles.bubble} ${m.role === 'user' ? styles['bubble--user'] : styles['bubble--assistant']}`}
               >
-                <span className={styles.role}>{m.role === 'user' ? 'You:' : 'Tutor:'}</span>
+                <span className={styles.role}>{m.role === 'user' ? 'Me:' : 'Tutor:'}</span>
                 {isAssistant && m.audio?.length ? (
                   <button
                     type="button"
