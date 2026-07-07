@@ -27,6 +27,8 @@ export function Avatar({
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
   const amplitudeBufferRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
   const mouthOpenRef = useRef<number>(0);
+  const blinkStartRef = useRef<number>(-1);
+  const nextBlinkRef = useRef<number>(0);
 
   // Clear shared analyser only on full unmount, so subsequent messages can reuse it.
   useEffect(() => {
@@ -114,13 +116,13 @@ export function Avatar({
   };
 
   // Animation frame
-  useFrame(() => {
+  useFrame((state) => {
     const audioElement = audioRef.current;
     const isAudioPlaying = audioElement && !audioElement.paused;
 
     // Amplitude-driven mouth (RMS of the playing audio drives the open/close)
     const useAmplitudeMouth = isAudioPlaying && !!analyserRef.current;
-    const amplitudeVisemes = new Set<string>(['viseme_AA', 'viseme_O']);
+    const amplitudeVisemes = new Set<string>(['viseme_aa', 'viseme_O']);
 
     // Reset all visemes (skip the two AA/O drive amplitude path manages itself)
     allVisemes.forEach((viseme) => {
@@ -143,17 +145,38 @@ export function Avatar({
       const rms = Math.sqrt(sumSq / buf.length);
       const target = Math.min(1, rms * 4);
       mouthOpenRef.current = lerp(mouthOpenRef.current, target, 0.35);
-      lerpMorphTarget('viseme_AA', mouthOpenRef.current, 0.5);
-      lerpMorphTarget('viseme_O', mouthOpenRef.current * 0.3, 0.5);
+      lerpMorphTarget('viseme_aa', mouthOpenRef.current * 0.55, 0.5);
+      lerpMorphTarget('viseme_O', mouthOpenRef.current * 0.25, 0.5);
     } else {
       mouthOpenRef.current = lerp(mouthOpenRef.current, 0, 0.35);
     }
 
+    // Blink: fast close/open every 2-6s (morphs not in expression sets, no conflict)
+    const t = state.clock.elapsedTime;
+    if (t >= nextBlinkRef.current) {
+      blinkStartRef.current = t;
+      nextBlinkRef.current = t + 2 + Math.random() * 4;
+    }
+    const sinceBlink = t - blinkStartRef.current;
+    const blink = sinceBlink < 0.25 ? Math.sin((sinceBlink / 0.25) * Math.PI) : 0;
+    lerpMorphTarget('eyeBlinkLeft', blink, 0.8);
+    lerpMorphTarget('eyeBlinkRight', blink, 0.8);
+
     // Apply facial expression
     const expressionTargets = facialExpressions[facialExpression] || {};
 
+    // Brows follow speech emphasis; skip their reset while amplitude path owns them
+    const speechBrows = new Set<string>([
+      'browInnerUp',
+      'browOuterUpLeft',
+      'browOuterUpRight',
+    ]);
+
     // Reset expression morph targets not in current expression
     allExpressionMorphTargets.forEach((target) => {
+      if (useAmplitudeMouth && speechBrows.has(target)) {
+        return;
+      }
       if (!(target in expressionTargets)) {
         lerpMorphTarget(target, 0, 0.1);
       }
@@ -163,6 +186,17 @@ export function Avatar({
     Object.entries(expressionTargets).forEach(([target, value]) => {
       lerpMorphTarget(target, value as number, 0.1);
     });
+
+    // Gentle brow lift tracking speech energy (expression keeps priority)
+    if (useAmplitudeMouth) {
+      const emphasis = mouthOpenRef.current;
+      speechBrows.forEach((target) => {
+        if (!(target in expressionTargets)) {
+          const amount = target === 'browInnerUp' ? 0.25 : 0.15;
+          lerpMorphTarget(target, emphasis * amount, 0.08);
+        }
+      });
+    }
   });
 
   return (

@@ -3,7 +3,7 @@ export const allVisemes = [
   'viseme_PP',
   'viseme_kk',
   'viseme_I',
-  'viseme_AA',
+  'viseme_aa',
   'viseme_O',
   'viseme_U',
   'viseme_FF',
