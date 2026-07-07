@@ -8,4 +8,16 @@ export interface AvatarProps {
   onAudioEnd?: () => void;
   position?: [number, number, number];
   scale?: number;
+  mouthGain?: number; // viseme_aa scale
+  mouthOGain?: number; // viseme_O scale
+}
+
+export interface AvatarProfile {
+  id: string;
+  label: string;
+  modelUrl: string;
+  position: [number, number, number];
+  scale: number;
+  mouthGain: number; // viseme_aa scale
+  mouthOGain: number; // viseme_O scale
 }

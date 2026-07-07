@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { AvatarProps } from '../types/avatar.types';
+import { AVATAR_PROFILES } from '../utils/avatarProfiles';
 import { allVisemes, lerp } from '../utils/lipsync';
 import { getAudioContext } from '../utils/audioContext';
 import { setSharedAnalyser } from '../utils/sharedAnalyser';
@@ -19,6 +20,8 @@ export function Avatar({
   onAudioEnd,
   position = [0, -1.5, 0],
   scale = 1,
+  mouthGain = 0.55,
+  mouthOGain = 0.25,
 }: AvatarProps) {
   const { scene } = useGLTF(modelUrl);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -145,8 +148,8 @@ export function Avatar({
       const rms = Math.sqrt(sumSq / buf.length);
       const target = Math.min(1, rms * 4);
       mouthOpenRef.current = lerp(mouthOpenRef.current, target, 0.35);
-      lerpMorphTarget('viseme_aa', mouthOpenRef.current * 0.55, 0.5);
-      lerpMorphTarget('viseme_O', mouthOpenRef.current * 0.25, 0.5);
+      lerpMorphTarget('viseme_aa', mouthOpenRef.current * mouthGain, 0.5);
+      lerpMorphTarget('viseme_O', mouthOpenRef.current * mouthOGain, 0.5);
     } else {
       mouthOpenRef.current = lerp(mouthOpenRef.current, 0, 0.35);
     }
@@ -206,5 +209,7 @@ export function Avatar({
   );
 }
 
-// Preload the model
-useGLTF.preload('/models/female_adult_01.glb');
+// Preload all avatar models
+Object.values(AVATAR_PROFILES).forEach((profile) => {
+  useGLTF.preload(profile.modelUrl);
+});

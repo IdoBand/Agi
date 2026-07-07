@@ -1,6 +1,7 @@
 import { Environment, OrbitControls } from '@react-three/drei';
 import { Avatar } from './Avatar';
 import { Message } from '../types/message.types';
+import { AVATAR_PROFILES, DEFAULT_AVATAR_ID } from '../utils/avatarProfiles';
 
 interface ExperienceProps {
   currentMessage: Message | null;
@@ -8,6 +9,8 @@ interface ExperienceProps {
 }
 
 export function Experience({ currentMessage, onAudioEnd }: ExperienceProps) {
+  const profile = AVATAR_PROFILES[DEFAULT_AVATAR_ID];
+
   return (
     <>
       {/* Lighting */}
@@ -24,13 +27,15 @@ export function Experience({ currentMessage, onAudioEnd }: ExperienceProps) {
 
       {/* Avatar */}
       <Avatar
-        modelUrl="/models/female_adult_01.glb"
+        modelUrl={profile.modelUrl}
         audio={currentMessage?.audio}
         playId={currentMessage?.playId}
         facialExpression={currentMessage?.facialExpression || 'smile'}
         onAudioEnd={onAudioEnd}
-        position={[0, -1.5, 0]}
-        scale={1.5}
+        position={profile.position}
+        scale={profile.scale}
+        mouthGain={profile.mouthGain}
+        mouthOGain={profile.mouthOGain}
       />
 
       {/* Camera Controls */}
