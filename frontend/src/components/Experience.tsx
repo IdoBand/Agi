@@ -24,7 +24,7 @@ export function Experience({ currentMessage, onAudioEnd }: ExperienceProps) {
 
       {/* Avatar */}
       <Avatar
-        modelUrl="/models/avatar.glb"
+        modelUrl="/models/female_adult_01.glb"
         audio={currentMessage?.audio}
         playId={currentMessage?.playId}
         facialExpression={currentMessage?.facialExpression || 'smile'}

@@ -173,4 +173,4 @@ export function Avatar({
 }
 
 // Preload the model
-useGLTF.preload('/models/avatar.glb');
+useGLTF.preload('/models/female_adult_01.glb');
