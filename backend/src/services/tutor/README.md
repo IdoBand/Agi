@@ -1,155 +1,163 @@
 # Tutor Mode
 
-Free-form conversational Hungarian tutor driven by Claude via the Agent SDK
-(`@anthropic-ai/claude-agent-sdk`). Runs alongside the strict quiz mode — both
-share the same STT / TTS / avatar pipeline. The avatar mouth is driven on the
-frontend by audio amplitude (no server-side lipsync).
+Free-form conversational Hungarian tutor (citizenship-interview examiner)
+driven by an LLM agent built on **LangChain/LangGraph**
+(`createReactAgent`). Runs alongside the strict quiz mode — both share the
+same STT / TTS / avatar pipeline. The avatar mouth is driven on the frontend
+by audio amplitude (no server-side lipsync).
 
 ## Files
 
-- `claude-agent.service.ts` — agent runner (one `query()` per turn, history
-  fallback, session map)
-- `tutor-tools.ts` — custom LangChain tools (list/read + one fused evaluate-and-draw per mode)
-- `system-prompt.ts` — persona + tool-use rules
+- `claude-agent.service.ts` — agent runner: `runTurnStream()` async generator
+  (sentence events), session map, per-step text gating, LLM/tool telemetry
+- `tutor-tools.ts` — LangChain tools (list/read knowledge + one fused
+  evaluate-and-draw per mode; bank-only mode adds `listTopics`)
+- `system-prompt.ts` — examiner persona + tool-use rules
+  (`…_BILINGUAL`, `…_BANK_ONLY`; `ACTIVE_…` picks the non-bank prompt)
+- `stt-prompt.ts` — Whisper context prompt (scene + last examiner reply)
+- `session-trace.ts` — markdown transcripts in `logs/tutor-sessions/<sid>.md`
 - `knowledge.service.ts` — manifest loader, path-traversal guard
+- `providers/` — `llm-provider.factory.ts` selects Anthropic | OpenAI
+  (`LLM_PROVIDER`); each provider builds the chat model, system message, and
+  normalizes usage metadata
 - `../../../knowledge/manifest.json` + `*.md` — curated lessons
-- `../../controllers/tutor.controller.ts` — pipeline orchestrator
+- `../../controllers/tutor.controller.ts` — SSE pipeline orchestrator
 - `../../routes/tutor.routes.ts` — `POST /tutor/turn`, `POST /tutor/reset`
 
-## One turn end-to-end
+## One turn end-to-end (SSE)
 
 ```
-mic Blob ─► POST /tutor/turn ─► uploadAudio (multer writes temp/<wf>/input/original.webm)
-       ─► sttService.transcribe(path)              [reused: stt.service.ts]
-       ─► claudeAgent.runTurn(sessionId, text)     [NEW]
+mic Blob ─► POST /tutor/turn ─► uploadAudio (multer temp file)
+       ─► sttService.transcribe(path, ctx, sttPrompt)   [stt-prompt.ts adds scene + last reply]
+       ─► SSE event: transcript
+       ─► runTurnStream(sessionId, text, bankOnly)      [claude-agent.service.ts]
               │
-              ├─ load history for sessionId from in-memory Map
-              ├─ build prompt = transcript + "Learner: <text>"
-              ├─ query({ prompt, options:{ systemPrompt, mcpServers:{tutor},
-              │           allowedTools:[mcp__tutor__*], tools:[],
-              │           permissionMode:'bypassPermissions' }})
-              ├─ async iterate; agent may call tools (executed in-process,
-              │  results fed back automatically by SDK), accumulate text
-              └─ append {user,assistant} to history; return text (or fallback)
-       ─► ttsService.synthesize(text) ─► mp3 buf   [reused: tts.service.ts]
-       ─► saveToFile ─► read mp3 ─► base64
-       ─► { content, audio, facialExpression, userTranscript }
+              ├─ createReactAgent({ llm, tools, prompt, checkpointer: MemorySaver })
+              │    thread_id per session → history lives in the checkpointer
+              ├─ agent.streamEvents(v2): tokens accumulate in a buffer,
+              │  split on sentence boundaries → yield {idx, hu}
+              └─ tool calls run in-process; usage + latency logged per LLM call
+       ─► per sentence: SSE event: sentence  +  ttsService.synthesize(hu)
+       ─► TTS results re-ordered by idx ─► SSE event: audio {idx, base64 mp3}
+       ─► SSE event: done {fullHu} ─► session-trace appends the turn
 ```
 
-## Why this architecture
+Sentence-level streaming means first audio plays while the model is still
+generating. TTS runs concurrently per sentence; audio events are emitted in
+order (`nextEmitIdx` drain).
 
-- **`query()` per turn, not a long-lived session object.** The Agent SDK's
-  `query()` runs a full agentic loop until the model stops calling tools, then
-  closes. Stateless from the SDK's point of view — we reconstruct context by
-  passing the whole transcript as the next prompt. Simpler than the SDK's own
-  session resume (which writes to disk under `~/.claude`), and survives
-  restarts only as long as the in-memory Map does (not at all). For a v1 voice
-  tutor that's fine.
-- **`tools: []`** disables the built-in Claude Code tools (Read, Bash,
-  Grep…). Without this the agent could read your filesystem.
-- **`allowedTools`** whitelists only the tutor tools, so even if defaults
-  sneak through they're rejected.
-- **`permissionMode: 'bypassPermissions'`** — the agent runs unattended; we
-  don't want a CLI permission prompt blocking the request.
+### Step gating (bank-only quirk)
 
-## How tools work
+The model's step #1 streams live (first-audio latency). Steps #2+ are
+buffered until their tool call is visible: a **silent re-draw**
+(`draw.skip='question'` with no `evaluation`) drops the buffered narration so
+"skipping this question" deliberation is never spoken; anything else flushes.
 
-The Agent SDK speaks **MCP** (Model Context Protocol). `createSdkMcpServer`
-builds an *in-process* MCP server — no subprocess, no network. Each tool is
-defined with `tool(name, description, zodSchema, handler)`; the SDK
-auto-generates the JSON schema from Zod and routes tool calls back to your
-handler. The agent sees them as `mcp__tutor__listKnowledge`, etc.
-(`mcp__<server>__<tool>`).
+## Why LangGraph
 
-The tools per mode (the draw + record tools are **fused** into one — recording rides along with the draw instead of taking its own Sonnet round-trip):
+- `createReactAgent` gives the ReAct loop (model ↔ tools) for free;
+  `streamEvents(v2)` exposes token chunks, tool start/end, and usage metadata
+  in one stream — exactly what sentence-level SSE + telemetry need.
+- `MemorySaver` checkpointer keeps per-session history under a `thread_id`,
+  so each turn sends only the new `HumanMessage` instead of replaying the
+  transcript manually.
+- Provider-agnostic: the factory swaps Anthropic ↔ OpenAI behind one
+  `ILlmProvider` interface. The Anthropic provider sets ephemeral
+  prompt-cache breakpoints (system block + moving tail) so the tools→system
+  prefix and prior turns are read from cache; OpenAI caching is
+  automatic/server-side. Observable via `cacheRead`/`cacheWrite` on
+  `llm_call_end` log lines.
+
+## Tools
+
+Two modes, chosen per session by the `bankOnly` flag on `/tutor/turn`. The
+evaluate + draw tools are **fused** — recording an evaluation rides along
+with drawing the next question instead of taking its own LLM round-trip:
 
 | Tool | Mode | Purpose |
 |---|---|---|
 | `listKnowledge` | both | reads `manifest.json`, returns `{entries:[{path,title,summary,tags}]}` — the agent's "table of contents" |
 | `readKnowledge({path})` | both | path must be in manifest; resolves under `knowledgeDir` and asserts the resolved path stays inside (defeats `../`) |
 | `evaluateAndDrawPractice({evaluation?,draw?})` | bilingual/active | **fused**: optional `evaluation {topic,correct,note}` appends to the per-session eval log; optional `draw {category?}` returns a random Q&A minus served IDs. Both optional → first question is draw-only, a correct answer is eval+draw in one call, an eval-only call records without drawing |
-| `evaluateAndDrawNext({evaluation?,draw?})` | bank-only | **fused**: same `evaluation`; `draw {skip:'none'\|'question'\|'category'}` advances the server-managed category cursor. Eval-only call leaves the cursor untouched |
+| `listTopics` | bank-only | read-only list of bank categories with 1-based numbers (for jumps) |
+| `evaluateAndDrawNext({evaluation?,draw?})` | bank-only | **fused**: same `evaluation`; `draw {skip:'none'\|'question'\|'category', jumpToTopic?}` advances the server-managed category cursor (jump wins over skip). Eval-only call leaves the cursor untouched. Returns `{newCategory,categoryName}` on category entry, `{done:true}` when exhausted |
 
 ## Adding a new tool
 
-In `tutor-tools.ts`, inside `buildTutorMcpServer`:
+In `tutor-tools.ts`, inside `buildTutorTools` (or `buildBankOnlyTutorTools`):
 
 ```ts
+import { tool } from '@langchain/core/tools';
+
 const myTool = tool(
-  'doThing',
-  'What it does, when the agent should call it.',
-  { foo: z.string(), bar: z.number().optional() },
-  async (args) => {
+  async (args: { foo: string }) => {
     const result = await whatever(args.foo);
-    return { content: [{ type: 'text', text: JSON.stringify(result) }] };
-  }
+    return JSON.stringify(result);
+  },
+  {
+    name: 'doThing',
+    description: 'What it does, when the agent should call it.',
+    schema: z.object({ foo: z.string() }),
+  },
 );
 ```
 
-Then add `myTool` to the `tools: [...]` array passed to `createSdkMcpServer`,
-and add `'mcp__tutor__doThing'` to `TUTOR_TOOL_NAMES`. Mention it in the
-system prompt so Claude knows when to use it.
+Add it to the returned tools array and mention it in the system prompt so
+the model knows when to call it. Tools are rebuilt per turn with the
+`sessionId` closed over, so per-session state (eval logs, cursors) needs no
+extra plumbing.
 
 ## Adding curated knowledge
 
 1. Drop a new `*.md` file in `backend/knowledge/`.
 2. Add an entry to `manifest.json`: `{path, title, summary, tags}`.
 3. That's it — `listKnowledge` will surface it on the next session start, and
-   `readKnowledge` will accept the path. `summary` is what Claude uses to
+   `readKnowledge` will accept the path. `summary` is what the model uses to
    decide whether to read the file, so keep it tight and accurate.
 
 The manifest is the *only* thing the agent sees up-front; files not listed
 there cannot be read (defense in depth alongside the path-traversal guard).
 
-## Reuse map (existing → tutor)
-
-| Existing | Used by tutor for |
-|---|---|
-| `sttService.transcribe(path, ctx)` | learner audio → text |
-| `ttsService.synthesize(text)` + `saveToFile` | reply text → mp3 |
-| `uploadAudio` middleware | multipart parsing + temp dir + `req.workflowId` |
-| `WorkflowContext` + `deleteWorkflowDir` | per-request temp file lifecycle |
-| `loadQuestions()` (via new `getRandomQuestionMeta`) | tool 3's question source |
-| Frontend `useVoiceRecorder` | unchanged, shared with quiz |
-| Frontend `Experience` / `Avatar` | consume same `Message` shape — controller returns `content` (not `text`) so mapping is trivial |
-
 ## Session state
 
-- **Backend:** `Map<sessionId, {lastTouched, history}>` in
-  `claude-agent.service.ts`. 1h TTL swept on each turn. Eval logs live in a
-  parallel Map in `tutor-tools.ts` keyed by the same id.
+- **Backend:** `Map<sessionId, {lastTouched, threadId, turnCount, lastReply,
+  bankOnly}>` in `claude-agent.service.ts`, 1h TTL swept on each turn.
+  Conversation history lives in the `MemorySaver` checkpointer under
+  `threadId`. Eval logs / served-question sets / bank cursors live in
+  parallel Maps in `tutor-tools.ts` keyed by the same id.
+- **Traces:** every turn appends to `logs/tutor-sessions/<sessionId>.md`
+  (learner text, LLM calls + token usage, tool calls, examiner reply).
+  Reset rotates the file aside with a timestamp.
 - **Frontend:** `useTutorChat` generates a uuid on `startSession`, sends it
-  with every `/tutor/turn`, holds an `AbortController` so re-recording cancels
-  in-flight requests. `POST /tutor/reset` drops both maps.
-
-## Mode isolation (frontend)
-
-`App.tsx` only mounts **one** of `<QuizMode/>` or `<TutorChatMode/>` at a
-time. Both hooks register a global T-key listener; mounting both would
-collide. The active mode pushes `currentMessage` up via `onMessage` and
-registers its `onAudioEnd` callback via `onAudioEndRef`, so the shared
-`<Experience/>` plays whichever is active.
+  with every `/tutor/turn`, holds an `AbortController` so re-recording
+  cancels in-flight requests. `POST /tutor/reset` purges all backend maps +
+  the checkpointer thread.
 
 ## Config
 
-`backend/src/config/index.ts` adds:
+From `backend/src/config/index.ts`:
 
-```ts
-anthropic: { apiKey: process.env.ANTHROPIC_API_KEY, model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6' },
-tutor:     { knowledgeDir: path.resolve(process.env.TUTOR_KNOWLEDGE_DIR || './knowledge') },
 ```
-
-`ANTHROPIC_API_KEY` is required — `claude-agent.service.ts` throws on the
-first turn if it's missing rather than silently degrading.
+ANTHROPIC_API_KEY       required when LLM_PROVIDER=anthropic (throws on first turn if missing)
+ANTHROPIC_MODEL         default claude-sonnet-4-6
+LLM_PROVIDER            anthropic (default) | openai
+LLM_OPENAI_MODEL        tutor-only OpenAI model, default gpt-5-mini
+TUTOR_KNOWLEDGE_DIR     default ./knowledge
+TUTOR_PROMPT_VARIANT    baseline | bilingual (parsed in config; the active
+                        prompt is currently pinned to BILINGUAL in system-prompt.ts)
+TUTOR_STT_SCENE         Whisper scene line (stt-prompt.ts), Hungarian default
+```
 
 ## Known limitations / v2 ideas
 
-- **Latency.** Reply → TTS → audio is a few seconds end-to-end. The avatar
-  mouth animates from audio amplitude on the client (no lipsync step).
-- **In-memory history.** Backend restart drops sessions. Persist to disk or
-  use the SDK's own `resume:` if needed.
-- **Empty-reply fallback.** If the model only emits tool calls with no final
-  text, we return `"Bocsánat, nem hallottam jól. Mondanád újra?"` so
+- **In-memory sessions.** Backend restart drops the session map, checkpointer
+  threads, eval logs, and cursors. Only the markdown traces survive.
+- **Empty-reply fallback.** If the model emits only tool calls with no final
+  text, we speak `"Bocsánat, nem hallottam jól. Mondanád újra?"` so
   ElevenLabs doesn't reject an empty input.
-- **Eval logs are write-only.** the fused tool's `evaluation` arg appends; nothing reads
-  them yet. Add a `summarizeProgress` tool or end-of-session recap when ready.
+- **Eval logs are write-only.** The fused tools' `evaluation` arg appends;
+  nothing reads them yet. Add a `summarizeProgress` tool or end-of-session
+  recap when ready.
+- **Prompt variant is vestigial.** `TUTOR_PROMPT_VARIANT` parses but nothing
+  consumes it; switch prompts via `ACTIVE_CITIZENSHIP_INTERVIEW_PROMPT` in
+  `system-prompt.ts`.
