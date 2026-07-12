@@ -1,6 +1,9 @@
 import { Canvas } from '@react-three/fiber';
-import { Suspense, useCallback, useRef, useState } from 'react';
+import { Suspense, startTransition, useCallback, useRef, useState } from 'react';
 import { Experience } from './components/Experience';
+import { DEFAULT_AVATAR_ID, getAvatarProfile } from './utils/avatarProfiles';
+import { useLocalStorage } from './hooks/useLocalStorage';
+import { StorageKeys } from './utils/storage';
 import { TutorConsoleStack } from './components/TutorConsoleStack';
 import { SpeechBubbleVisualizer } from './components/SpeechBubbleVisualizer';
 import { Sidebar } from './components/Sidebar';
@@ -24,15 +27,23 @@ function SceneContent({
   currentMessage,
   onAudioEnd,
   onLoaded,
+  avatarId,
 }: {
   currentMessage: Message | null;
   onAudioEnd: () => void;
   onLoaded: () => void;
+  avatarId: string;
 }) {
   useState(() => {
     onLoaded();
   });
-  return <Experience currentMessage={currentMessage} onAudioEnd={onAudioEnd} />;
+  return (
+    <Experience
+      currentMessage={currentMessage}
+      onAudioEnd={onAudioEnd}
+      avatarId={avatarId}
+    />
+  );
 }
 
 export default function App() {
@@ -43,6 +54,21 @@ export default function App() {
   const [interruptState, setInterruptState] = useState<InterruptButtonState>('hidden');
   const audioEndCbRef = useRef<() => void>(() => {});
   const interruptCbRef = useRef<() => void>(() => {});
+
+  const [storedAvatarId, setAvatarId] = useLocalStorage<string>(
+    StorageKeys.avatarId,
+    DEFAULT_AVATAR_ID
+  );
+  // Normalize stale ids at source so picker highlight + rendered model agree.
+  const avatarId = getAvatarProfile(storedAvatarId).id;
+  // startTransition keeps the old model visible while a not-yet-loaded model
+  // suspends (Suspense fallback is null — would blank the canvas).
+  const handleAvatarChange = useCallback(
+    (id: string) => {
+      startTransition(() => setAvatarId(id));
+    },
+    [setAvatarId]
+  );
 
   const recorder = useVoiceRecorder();
 
@@ -66,6 +92,8 @@ export default function App() {
         onSpeakingChange={setTutorSpeaking}
         onInterruptRef={registerInterruptCb}
         onInterruptStateChange={setInterruptState}
+        avatarId={avatarId}
+        onAvatarChange={handleAvatarChange}
       />
 
       <div className={styles.stage}>
@@ -81,6 +109,7 @@ export default function App() {
               currentMessage={currentMessage}
               onAudioEnd={handleAudioEnd}
               onLoaded={() => setIsModelLoaded(true)}
+              avatarId={avatarId}
             />
           </Suspense>
         </Canvas>

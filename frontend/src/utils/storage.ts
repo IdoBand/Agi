@@ -1,6 +1,7 @@
 // Typed key registry — no magic strings.
 export const StorageKeys = {
   micDeviceId: 'agi.micDeviceId',
+  avatarId: 'agi.avatarId',
 } as const;
 
 export type StorageKey = (typeof StorageKeys)[keyof typeof StorageKeys];
