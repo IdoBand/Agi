@@ -52,6 +52,7 @@ export default function App() {
   const [pttAvailable, setPttAvailable] = useState(false);
   const [tutorSpeaking, setTutorSpeaking] = useState(false);
   const [interruptState, setInterruptState] = useState<InterruptButtonState>('hidden');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const audioEndCbRef = useRef<() => void>(() => {});
   const interruptCbRef = useRef<() => void>(() => {});
 
@@ -94,6 +95,8 @@ export default function App() {
         onInterruptStateChange={setInterruptState}
         avatarId={avatarId}
         onAvatarChange={handleAvatarChange}
+        collapsed={sidebarCollapsed}
+        onCollapse={() => setSidebarCollapsed(true)}
       />
 
       <div className={styles.stage}>
@@ -122,6 +125,8 @@ export default function App() {
           speaking={tutorSpeaking}
           interruptState={interruptState}
           onInterrupt={handleInterrupt}
+          sidebarCollapsed={sidebarCollapsed}
+          onExpandSidebar={() => setSidebarCollapsed(false)}
         />
 
         {!isModelLoaded && <LoadingOverlay />}

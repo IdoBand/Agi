@@ -26,43 +26,48 @@ interface Props {
   onInterruptStateChange?: (s: InterruptButtonState) => void;
   avatarId: string;
   onAvatarChange: (id: string) => void;
+  collapsed: boolean;
+  onCollapse: () => void;
 }
 
-export function Sidebar({ recorder, onMessage, onAudioEndRef, onPttAvailableChange, onSpeakingChange, onInterruptRef, onInterruptStateChange, avatarId, onAvatarChange }: Props) {
+export function Sidebar({ recorder, onMessage, onAudioEndRef, onPttAvailableChange, onSpeakingChange, onInterruptRef, onInterruptStateChange, avatarId, onAvatarChange, collapsed, onCollapse }: Props) {
   const [mode, setMode] = useState<Mode>('tutor');
   const [sessionActive, setSessionActive] = useState(false);
 
   return (
-    <aside className={styles.aside}>
-      {!sessionActive && (
-        <>
-          <MainMenu mode={mode} onModeChange={setMode} />
-          <AvatarPicker avatarId={avatarId} onAvatarChange={onAvatarChange} />
-        </>
-      )}
+    <aside className={collapsed ? `${styles.aside} ${styles['aside--collapsed']}` : styles.aside}>
+      <div className={styles.inner}>
+        {!sessionActive && (
+          <>
+            <MainMenu mode={mode} onModeChange={setMode} />
+            <AvatarPicker avatarId={avatarId} onAvatarChange={onAvatarChange} />
+          </>
+        )}
 
-      {mode === 'quiz' && (
-        <QuizMode
-          recorder={recorder}
-          onMessage={onMessage}
-          onAudioEndRef={onAudioEndRef}
-          onPttAvailableChange={onPttAvailableChange}
-          onActiveChange={setSessionActive}
-          onSpeakingChange={onSpeakingChange}
-        />
-      )}
-      {mode === 'tutor' && (
-        <TutorMode
-          recorder={recorder}
-          onMessage={onMessage}
-          onAudioEndRef={onAudioEndRef}
-          onPttAvailableChange={onPttAvailableChange}
-          onActiveChange={setSessionActive}
-          onSpeakingChange={onSpeakingChange}
-          onInterruptRef={onInterruptRef}
-          onInterruptStateChange={onInterruptStateChange}
-        />
-      )}
+        {mode === 'quiz' && (
+          <QuizMode
+            recorder={recorder}
+            onMessage={onMessage}
+            onAudioEndRef={onAudioEndRef}
+            onPttAvailableChange={onPttAvailableChange}
+            onActiveChange={setSessionActive}
+            onSpeakingChange={onSpeakingChange}
+          />
+        )}
+        {mode === 'tutor' && (
+          <TutorMode
+            recorder={recorder}
+            onMessage={onMessage}
+            onAudioEndRef={onAudioEndRef}
+            onPttAvailableChange={onPttAvailableChange}
+            onActiveChange={setSessionActive}
+            onSpeakingChange={onSpeakingChange}
+            onInterruptRef={onInterruptRef}
+            onInterruptStateChange={onInterruptStateChange}
+            onCollapseSidebar={onCollapse}
+          />
+        )}
+      </div>
     </aside>
   );
 }

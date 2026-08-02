@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { TutorPhase, TutorTranscriptEntry } from '../../types/tutor.types';
 import { ToggleSetting } from '../ToggleSetting/ToggleSetting';
 import { BackButton } from '../BackButton';
+import { PanelIcon } from '../PanelIcon';
 import { TricolorSpinner } from '../TricolorSpinner';
 import styles from './TutorControlPanel.module.css';
 
@@ -16,6 +17,7 @@ interface Props {
   onBack: () => void;
   onReplay: (i: number, chunks: string[]) => void;
   replayingIdx: number | null;
+  onCollapseSidebar: () => void;
 }
 
 function SpeakerIcon() {
@@ -28,6 +30,41 @@ function SpeakerIcon() {
     >
       <polygon points="3,9 7,9 12,4 12,20 7,15 3,15" />
       <path d="M16 8a5 5 0 0 1 0 8" fill="none" stroke="currentColor" strokeWidth="2" />
+    </svg>
+  );
+}
+
+function EyeIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={styles.icon}
+    >
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+function EyeOffIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={styles.icon}
+    >
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+      <circle cx="12" cy="12" r="3" />
+      <line x1="4" y1="4" x2="20" y2="20" />
     </svg>
   );
 }
@@ -47,8 +84,7 @@ const BANK_HINTS: readonly { label: string; say: string }[] = [
   { label: 'Jump to a topic', say: 'say a topic name or number' },
 ];
 
-export function TutorControlPanel({ phase, sessionId, transcript, micSelected, bankOnly, onBankOnlyChange, onStart, onBack, onReplay, replayingIdx }: Props) {
-  const [showHistory, setShowHistory] = useState(true);
+export function TutorControlPanel({ phase, sessionId, transcript, micSelected, bankOnly, onBankOnlyChange, onStart, onBack, onReplay, replayingIdx, onCollapseSidebar }: Props) {
   const [hideTutor, setHideTutor] = useState(false);
   const [englishIdxs, setEnglishIdxs] = useState<Set<number>>(new Set());
   const [translations, setTranslations] = useState<Record<number, string>>({});
@@ -75,10 +111,10 @@ export function TutorControlPanel({ phase, sessionId, transcript, micSelected, b
   }, [bankOnly]);
 
   useEffect(() => {
-    if (showHistory && transcriptRef.current) {
+    if (transcriptRef.current) {
       transcriptRef.current.scrollTop = transcriptRef.current.scrollHeight;
     }
-  }, [transcript, showHistory]);
+  }, [transcript]);
 
   useEffect(() => {
     if (transcript.length === 0) {
@@ -168,14 +204,6 @@ export function TutorControlPanel({ phase, sessionId, transcript, micSelected, b
     <div className={styles.panel}>
       <div className={styles['header-row']}>
         <BackButton onClick={onBack} />
-      </div>
-      <div className={styles.controls}>
-        <button
-          onClick={() => setShowHistory((v) => !v)}
-          className={styles['link-btn']}
-        >
-          {showHistory ? 'Hide' : 'Show'} transcript ({transcript.length})
-        </button>
         <div className={styles['status-slot']}>
           {phase === 'thinking' && (
             <div className={styles['status-row']}>
@@ -192,69 +220,77 @@ export function TutorControlPanel({ phase, sessionId, transcript, micSelected, b
         </div>
         <button
           onClick={() => setHideTutor((v) => !v)}
-          className={styles['link-btn']}
+          className={styles['icon-btn']}
+          aria-label={hideTutor ? 'Show tutor text' : 'Hide tutor text'}
+          title={hideTutor ? 'Show tutor text' : 'Hide tutor text'}
         >
-          {hideTutor ? 'Show' : 'Hide'} tutor
+          {hideTutor ? <EyeOffIcon /> : <EyeIcon />}
+        </button>
+        <button
+          onClick={onCollapseSidebar}
+          className={styles['icon-btn']}
+          aria-label="Hide sidebar"
+          title="Hide sidebar"
+        >
+          <PanelIcon className={styles.icon} />
         </button>
       </div>
 
-      {showHistory && (
-        <div ref={transcriptRef} className={`scrollbar-milky ${styles.transcript}`}>
-          {transcript.length === 0 && <div className={styles.empty}>No turns yet.</div>}
-          {transcript.map((m, i) => {
-            const isAssistant = m.role === 'assistant';
-            const showEn = isAssistant && englishIdxs.has(i);
-            const loading = loadingIdxs.has(i);
-            const en = translations[i] ?? m.textEn;
-            const body = showEn ? (en ?? '') : m.text;
-            return (
-              <div
-                key={i}
-                className={`${styles.bubble} ${m.role === 'user' ? styles['bubble--user'] : styles['bubble--assistant']}`}
-              >
-                <span className={styles.role}>{m.role === 'user' ? 'Me:' : 'Tutor:'}</span>
-                {isAssistant && m.audio?.length ? (
-                  <button
-                    type="button"
-                    onClick={() => onReplay(i, m.audio ?? [])}
-                    className={`${styles.speaker} ${replayingIdx === i ? styles['speaker--active'] : ''}`}
-                    disabled={phase === 'speaking' || !m.audio?.length}
-                    aria-label={replayingIdx === i ? 'Replaying message' : 'Replay message'}
-                    title={
-                      phase === 'speaking'
-                        ? replayingIdx === i
-                          ? 'Replaying…'
-                          : 'Tutor is speaking…'
-                        : 'Replay message'
-                    }
-                  >
-                    <SpeakerIcon />
-                  </button>
-                ) : null}
-                {isAssistant && m.text && (
-                  <button
-                    onClick={() => toggleLang(i, m.text)}
-                    className={styles.chip}
-                    disabled={loading}
-                  >
-                    {showEn ? 'HU' : 'EN'}
-                  </button>
+      <div ref={transcriptRef} className={`scrollbar-milky ${styles.transcript}`}>
+        {transcript.length === 0 && <div className={styles.empty}>No turns yet.</div>}
+        {transcript.map((m, i) => {
+          const isAssistant = m.role === 'assistant';
+          const showEn = isAssistant && englishIdxs.has(i);
+          const loading = loadingIdxs.has(i);
+          const en = translations[i] ?? m.textEn;
+          const body = showEn ? (en ?? '') : m.text;
+          return (
+            <div
+              key={i}
+              className={`${styles.bubble} ${m.role === 'user' ? styles['bubble--user'] : styles['bubble--assistant']}`}
+            >
+              <span className={styles.role}>{m.role === 'user' ? 'Me:' : 'Tutor:'}</span>
+              {isAssistant && m.audio?.length ? (
+                <button
+                  type="button"
+                  onClick={() => onReplay(i, m.audio ?? [])}
+                  className={`${styles.speaker} ${replayingIdx === i ? styles['speaker--active'] : ''}`}
+                  disabled={phase === 'speaking' || !m.audio?.length}
+                  aria-label={replayingIdx === i ? 'Replaying message' : 'Replay message'}
+                  title={
+                    phase === 'speaking'
+                      ? replayingIdx === i
+                        ? 'Replaying…'
+                        : 'Tutor is speaking…'
+                      : 'Replay message'
+                  }
+                >
+                  <SpeakerIcon />
+                </button>
+              ) : null}
+              {isAssistant && m.text && (
+                <button
+                  onClick={() => toggleLang(i, m.text)}
+                  className={styles.chip}
+                  disabled={loading}
+                >
+                  {showEn ? 'HU' : 'EN'}
+                </button>
+              )}
+              <span className={isAssistant && hideTutor ? styles.blur : ''}>
+                {showEn && loading && !en ? (
+                  <span className={styles.translating}>
+                    <span className={`${styles['spinner-inline']} animate-spin`} />
+                    <span className={styles['translating-label']}>translating...</span>
+                  </span>
+                ) : (
+                  body
                 )}
-                <span className={isAssistant && hideTutor ? styles.blur : ''}>
-                  {showEn && loading && !en ? (
-                    <span className={styles.translating}>
-                      <span className={`${styles['spinner-inline']} animate-spin`} />
-                      <span className={styles['translating-label']}>translating...</span>
-                    </span>
-                  ) : (
-                    body
-                  )}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      )}
+              </span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

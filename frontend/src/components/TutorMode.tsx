@@ -20,9 +20,10 @@ interface Props {
   onSpeakingChange: (v: boolean) => void;
   onInterruptRef?: (cb: () => void) => void;
   onInterruptStateChange?: (s: InterruptButtonState) => void;
+  onCollapseSidebar: () => void;
 }
 
-export function TutorMode({ recorder, onMessage, onAudioEndRef, onPttAvailableChange, onActiveChange, onSpeakingChange, onInterruptRef, onInterruptStateChange }: Props) {
+export function TutorMode({ recorder, onMessage, onAudioEndRef, onPttAvailableChange, onActiveChange, onSpeakingChange, onInterruptRef, onInterruptStateChange, onCollapseSidebar }: Props) {
   const tutor = useTutorChat(recorder, true, onPttAvailableChange, onInterruptStateChange);
 
   useEffect(() => {
@@ -57,6 +58,7 @@ export function TutorMode({ recorder, onMessage, onAudioEndRef, onPttAvailableCh
       onBack={tutor.resetSession}
       onReplay={tutor.replayMessage}
       replayingIdx={tutor.replayingIdx}
+      onCollapseSidebar={onCollapseSidebar}
     />
   );
 }
