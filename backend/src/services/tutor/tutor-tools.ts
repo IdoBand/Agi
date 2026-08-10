@@ -6,6 +6,12 @@ import { getAllQuestionMetas } from '../quiz.service.js';
 import { Question } from '../../types/quiz.types.js';
 import { TutorEvalLogEntry } from '../../types/tutor.types.js';
 import { logger } from '../../utils/logger.js';
+import {
+  isDynamicAnswer,
+  prefetchDynamicAnswer,
+  getDynamicAnswer,
+  dropDynamicAnswers,
+} from './dynamic-answer.service.js';
 
 const evalLogs = new Map<string, TutorEvalLogEntry[]>();
 const askedQuestions = new Map<string, Set<string>>();
@@ -35,6 +41,9 @@ async function buildBankCursor(): Promise<{ categories: string[]; questionsByCat
 
 export function dropBankCursor(sessionId: string): void {
   bankCursors.delete(sessionId);
+  // Piggybacks on every cursor teardown (purge + both resetSession branches) so
+  // dynamic resolutions never outlive their session.
+  dropDynamicAnswers(sessionId);
 }
 
 // Resolve a learner topic pick — a 1-based number ("3") or an exact (case-insensitive)
@@ -334,6 +343,12 @@ export function buildBankOnlyTutorTools(sessionId: string): StructuredToolInterf
         const pick = list[cur.questionIdx];
         cur.lastServedId = pick.id;
 
+        // Dynamic gold ("[...]"): start resolving now, while the model is still
+        // speaking the question, and withhold the bracket text from the model
+        // entirely — it must come back through resolveDynamicAnswer.
+        const dynamic = isDynamicAnswer(pick.answer);
+        if (dynamic) prefetchDynamicAnswer(sessionId, pick);
+
         const asked = askedQuestions.get(sessionId) ?? new Set<string>();
         asked.add(pick.id);
         askedQuestions.set(sessionId, asked);
@@ -342,10 +357,11 @@ export function buildBankOnlyTutorTools(sessionId: string): StructuredToolInterf
           recorded,
           id: pick.id,
           question: pick.question,
-          answer: pick.answer,
+          answer: dynamic ? null : pick.answer,
           englishTranslation: pick.englishTranslation,
           category: pick.category,
         };
+        if (dynamic) payload.dynamic = true;
         if (announceNewCategory) {
           payload.newCategory = true;
           payload.categoryName = categoryName;
@@ -359,10 +375,44 @@ export function buildBankOnlyTutorTools(sessionId: string): StructuredToolInterf
     {
       name: 'evaluateAndDrawNext',
       description:
-        "Fused tool: optionally record an evaluation of the learner's pending answer AND/OR draw the next bank question from the server-managed category-ordered cursor — in one call. When the learner has answered, pass BOTH `evaluation` and `draw` together. Pass only `evaluation` to record without advancing the cursor (e.g. a deferred-eval resolution). Pass only `draw` to advance without recording (first question, redundant re-draw with draw.skip='question'). draw.skip: 'question' skips current, 'category' jumps to next category, 'none' otherwise. draw.jumpToTopic (number from listTopics or category name) repositions the cursor to that topic, then continues sequentially once it is exhausted; when set, skip is ignored. Returns { newCategory:true, categoryName } when entering a new category, { done:true } when exhausted. Response includes the gold answer; do not speak it until the learner has tried.",
+        "Fused tool: optionally record an evaluation of the learner's pending answer AND/OR draw the next bank question from the server-managed category-ordered cursor — in one call. When the learner has answered, pass BOTH `evaluation` and `draw` together. Pass only `evaluation` to record without advancing the cursor (e.g. a deferred-eval resolution). Pass only `draw` to advance without recording (first question, redundant re-draw with draw.skip='question'). draw.skip: 'question' skips current, 'category' jumps to next category, 'none' otherwise. draw.jumpToTopic (number from listTopics or category name) repositions the cursor to that topic, then continues sequentially once it is exhausted; when set, skip is ignored. Returns { newCategory:true, categoryName } when entering a new category, { done:true } when exhausted. Response includes the gold answer; do not speak it until the learner has tried. When the drawn question's gold answer is resolved at runtime (date, weekday, weather) the response carries { dynamic:true, answer:null } instead — call resolveDynamicAnswer to obtain that question's gold answer.",
       schema: evaluateAndDrawNextSchema,
     },
   );
 
-  return [listTool, readTool, listTopicsTool, evaluateAndDrawNextTool] as StructuredToolInterface[];
+  const resolveDynamicAnswerTool = tool(
+    async () => {
+      // Unlike every other tool here this RETURNS its errors instead of throwing:
+      // a thrown tool error can send the model into a mid-turn retry loop.
+      try {
+        const lastServedId = bankCursors.get(sessionId)?.lastServedId ?? null;
+        if (!lastServedId) return JSON.stringify({ status: 'not-dynamic', questionId: null });
+        const all = await getAllQuestionMetas();
+        const q = all.find((item) => item.id === lastServedId);
+        // Server-side gate: resolution is only ever possible for the question
+        // currently in play, and only if ITS gold answer is bracketed. The model
+        // cannot reach this for any other question, nor author the query.
+        if (!q) return JSON.stringify({ status: 'not-dynamic', questionId: null });
+        const resolution = await getDynamicAnswer(sessionId, q);
+        return JSON.stringify(resolution);
+      } catch (e) {
+        logger.error(`[tutor-tool resolveDynamicAnswer] ${e}`);
+        return JSON.stringify({ status: 'unresolved', questionId: null, reason: 'error' });
+      }
+    },
+    {
+      name: 'resolveDynamicAnswer',
+      description:
+        "Takes no arguments. Resolves the gold answer of the question currently in play when its draw returned { dynamic:true, answer:null } (date, weekday, weather — facts that only exist at runtime). Returns { status:'resolved', questionId, value } where `value` IS that question's gold answer; { status:'unresolved', questionId, reason } when it could not be determined; { status:'not-dynamic', questionId } when the current question has an ordinary gold answer (nothing to resolve). Always check `questionId` matches the question you are grading. Emit no spoken text on the step that calls this.",
+      schema: z.object({}),
+    },
+  );
+
+  return [
+    listTool,
+    readTool,
+    listTopicsTool,
+    evaluateAndDrawNextTool,
+    resolveDynamicAnswerTool,
+  ] as StructuredToolInterface[];
 }

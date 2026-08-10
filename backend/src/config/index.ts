@@ -53,6 +53,11 @@ export const config = {
   anthropic: {
     apiKey: process.env.ANTHROPIC_API_KEY || '',
     model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6',
+    // Sub-call model that resolves runtime ("dynamic") gold answers — date, weekday,
+    // weather. Shares the apiKey above. Timeout must stay well under a turn's budget:
+    // it runs inside the learner-facing turn.
+    resolverModel: process.env.ANTHROPIC_RESOLVER_MODEL || 'claude-haiku-4-5',
+    resolverTimeoutMs: parseInt(process.env.ANTHROPIC_RESOLVER_TIMEOUT_MS || '6000', 10),
   },
 
   // Tutor LLM provider selection. Flip LLM_PROVIDER=openai (and set OPENAI_API_KEY)

@@ -6,6 +6,7 @@ import { HumanMessage } from '@langchain/core/messages';
 import type { UsageMetadata } from '@langchain/core/messages';
 import type { LanguageModelLike } from '@langchain/core/language_models/base';
 import { logger } from '../../utils/logger.js';
+import { extractTextContent } from '../../utils/message-content.utils.js';
 import { ACTIVE_CITIZENSHIP_INTERVIEW_PROMPT, CITIZENSHIP_INTERVIEW_PROMPT_BANK_ONLY } from './system-prompt.js';
 import { buildTutorTools, buildBankOnlyTutorTools, dropEvalLog, dropAskedQuestions, dropBankCursor } from './tutor-tools.js';
 import { ToolCallTrace, TurnTrace } from '../../types/tutor.types.js';
@@ -159,23 +160,6 @@ function extractSentences(buffer: string): { sentences: string[]; remainder: str
   return { sentences, remainder: buffer.slice(lastIdx) };
 }
 
-function chunkTextContent(content: unknown): string {
-  if (typeof content === 'string') return content;
-  if (Array.isArray(content)) {
-    let out = '';
-    for (const block of content) {
-      if (typeof block === 'string') {
-        out += block;
-      } else if (block && typeof block === 'object') {
-        const b = block as { type?: string; text?: unknown };
-        if (b.type === 'text' && typeof b.text === 'string') out += b.text;
-      }
-    }
-    return out;
-  }
-  return '';
-}
-
 // Narrow shape of the fused evaluateAndDraw* tool args, used only to detect a
 // silent redundancy re-draw (a step that skips a question without recording an
 // evaluation). Kept loose (optional/unknown-ish) since it parses raw event args.
@@ -203,10 +187,14 @@ function parseEvaluateAndDrawArgs(input: unknown): EvaluateAndDrawArgs | null {
   return raw as EvaluateAndDrawArgs;
 }
 
-// Silent-re-draw predicate (matches the tool schema: top-level `evaluation?` + `draw?`):
-// a draw that skips the current question with no evaluation recorded. This is the
-// turn shape whose narration ("Redundant — skipping silently.") must never be spoken.
-function isSilentReDraw(input: unknown): boolean {
+// Silent-step predicate — steps whose buffered text must be dropped rather than spoken:
+//  - a silent re-draw (matches the tool schema: top-level `evaluation?` + `draw?`):
+//    a draw that skips the current question with no evaluation recorded. Its narration
+//    ("Redundant — skipping silently.") must never reach the learner.
+//  - resolveDynamicAnswer: an internal gold-answer lookup; anything the model says
+//    while calling it is deliberation, not an examiner turn.
+function isSilentToolStep(name: string, input: unknown): boolean {
+  if (name === 'resolveDynamicAnswer') return true;
   const args = parseEvaluateAndDrawArgs(input);
   if (!args) return false;
   const draw = args.draw;
@@ -312,7 +300,7 @@ export async function* runTurnStream(
       if (ev.event === 'on_chat_model_stream') {
         // Hot path: never log per token; count/time at start/end only.
         const chunk = (ev.data as { chunk?: { content?: unknown } }).chunk;
-        const text = chunkTextContent(chunk?.content);
+        const text = extractTextContent(chunk?.content);
         if (text) {
           assistantText += text;
           if (stepIsLive) {
@@ -354,7 +342,7 @@ export async function* runTurnStream(
         const input = (ev.data as { input?: unknown }).input;
         // Resolve the buffered step's text now that we can see its tool args.
         if (!stepIsLive) {
-          if (isSilentReDraw(input)) {
+          if (isSilentToolStep(ev.name, input)) {
             // Drop the silent-re-draw narration: discard buffered text and roll
             // assistantText back so the persisted reply stays consistent.
             assistantText = assistantText.slice(0, stepRollbackMark);
